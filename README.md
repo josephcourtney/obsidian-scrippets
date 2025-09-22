@@ -102,6 +102,14 @@ The project uses TypeScript 5, esbuild, and ESLint. Source files live in `src/` 
 
 See [CHANGELOG.md](./CHANGELOG.md) for a human-readable history of updates.
 
+## Release process
+
+1. Confirm the working tree is clean and the GitHub CLI (`gh`) is authenticated (`gh auth login`).
+2. Run `npm run release -- --type=patch` (default) or `--type=minor` / `--type=major` depending on the bump you need.
+   - To specify an exact version instead, use `npm run release -- --version=1.2.3`.
+3. The release script will build the bundle, run `npm version`, push the branch and tags, and create a GitHub release using the notes from `CHANGELOG.md`.
+   - Add `--no-push` to skip pushing, or `--no-publish` to skip the GitHub release step.
+
 ## Project structure
 
 ```
@@ -116,6 +124,8 @@ obsidian-scrippets/
 ├── manifest.json
 ├── versions.json
 ├── styles.css
+├── scripts/
+│   └── release.mjs    # release automation script
 └── package.json
 ```
 
