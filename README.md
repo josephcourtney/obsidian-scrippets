@@ -1,106 +1,126 @@
 # Obsidian Scrippets
 
-An Obsidian plugin for creating and loading custom JavaScript “scrippets” directly from your vault.
-Each scrippet can define a command or execute code on startup, enabling personalized automation and extensions.
+Obsidian Scrippets lets you author small JavaScript “scrippets” right inside your vault. The plugin discovers files, parses optional metadata, and registers them as commands or opt-in startup jobs without requiring a build step.
 
 ## Features
 
-- Loads user-authored JavaScript classes from `<vault>/.obsidian/scrippets/*.js`.
-- Each `.js` file should export a class with an `invoke()` method.
-- Plugin registers each class as a command named after the file.
-- Executes startup scripts automatically from `<vault>/.obsidian/scrippets/startup/*.js`.
-- Provides an empty settings tab (reserved for future options).
-- Desktop-only (uses filesystem access).
+- Works on desktop and mobile using the Obsidian vault adapter (no `fs` dependency).
+- Configurable scrippet folder with live reload on file create, modify, rename, or delete.
+- Automatic metadata parsing from header comments for stable IDs, names, and descriptions.
+- Per-scrippet enable/disable switches, first-run confirmation, and manual run buttons.
+- Startup folder support with explicit opt-in and per-file toggles.
+- Settings UI to pick the folder, reload, inspect load errors, and add new templates.
 
-## Example Scrippet
+## Security
 
-`<vault>/.obsidian/scrippets/hello.js`:
+Scrippets execute with the same privileges as Obsidian. They can read, write, or delete any file in your vault and interact with the DOM. Only install scripts you trust, review the source, and enable **Run startup scripts at launch** only when you accept that the code runs automatically on every load.
+
+## Scrippet structure
+
+Scrippets live in `/<vault>/<folder>/*.js`. The default folder is `.obsidian/scrippets/`. Startup scrippets go into the `startup/` sub-folder.
+
+Each file must expose an `invoke(plugin)` function. Three export shapes are supported:
 
 ```js
-class Hello {
-  invoke() {
-    new Notice("Hello from scrippet!");
+/* @name: Toggle Wrap @id: toggle-wrap @desc: Toggle the nowrap snippet */
+class ToggleWrap {
+  async invoke(plugin) {
+    const { app } = plugin;
+    const snippets = app.customCss.enabledSnippets;
+    const enabled = snippets.has("nowrap");
+    app.customCss.setCssEnabledStatus("nowrap", !enabled);
   }
 }
 ```
 
-This creates a command **Scrippet: hello** in the Obsidian command palette.
+```js
+/* @name: Daily Notice @id: daily-notice */
+module.exports = class DailyNotice {
+  async invoke(plugin) {
+    await plugin.app.workspace.onLayoutReady(() => {
+      new Notice("Remember to review your daily note!");
+    });
+  }
+};
+```
+
+```js
+/* @name: Toast Hello @id: toast-hello */
+const invoke = async (plugin) => {
+  new Notice(`Hello from ${plugin.manifest.name}!`);
+};
+
+module.exports = { invoke };
+```
+
+### Metadata directives
+
+An optional block comment at the top of the file can provide directives. Recognised keys are:
+
+- `@name` – display name in settings and the command palette
+- `@id` – stable identifier; otherwise derived from the filename
+- `@desc` – short description shown in settings
+
+Additional directives are ignored but preserved in the source.
+
+### Startup scripts
+
+Files inside `<folder>/startup/` can run automatically when Obsidian loads. Enable **Run startup scripts at launch** in the settings tab to opt in. Each startup script can also be disabled individually. Errors are surfaced with `Notice` notifications so one failure does not prevent other scripts from running.
+
+## Settings highlights
+
+Open **Settings → Community plugins → Scrippets** to:
+
+- Change the scrippet folder.
+- Toggle startup execution, confirm-first-run, and review safety warnings.
+- Inspect loaded commands, enable/disable them, and run them manually.
+- View load errors or skipped files (e.g., duplicate IDs).
+- Add new files via the **+** dialog, including templates for the supported export shapes.
 
 ## Installation
 
-### Option 1: Install via BRAT (Beta Reviewer's Auto-update Tool)
-
-1. Install and enable the [Obsidian42 - BRAT](https://github.com/TfTHacker/obsidian42-brat) plugin from the community plugins browser.
-2. In BRAT settings, choose **Add Beta plugin**.
-3. Enter this repository's URL:
-   `
-   https://github.com/josephcourtney/obsidian-scrippets
-   `
-4. BRAT will clone the repository and keep it updated automatically.
-
-### Option 2: Manual installation
-1. Build the plugin:
-
-   ```bash
-   npm ci
-   npm run build
-   ```
-2. Copy the following files into your vault:
-
-   ```
-   <vault>/.obsidian/plugins/obsidian-scrippets/
-     ├── main.js
-     ├── manifest.json
-     ├── styles.css
-   ```
-3. Enable **Scrippets** in **Settings → Community plugins**.
+1. `npm install`
+2. `npm run build`
+3. Copy `main.js`, `manifest.json`, and `styles.css` into `<Vault>/.obsidian/plugins/obsidian-scrippets/`.
+4. Enable **Scrippets** in **Settings → Community plugins**.
 
 ## Development
 
-* **Install dependencies**:
+```bash
+npm install
+npm run dev    # watch mode
+npm run build  # type-check + bundle
+```
 
-  ```bash
-  npm install
-  ```
-* **Start development mode** (watch + rebuild on changes):
-
-  ```bash
-  npm run dev
-  ```
-* **Build for release**:
-
-  ```bash
-  npm run build
-  ```
-
-The build pipeline uses **TypeScript** and **esbuild**.
-Linting is configured via ESLint.
+The project uses TypeScript 5, esbuild, and ESLint. Source files live in `src/` and bundle to `main.js`.
 
 ## Versioning
 
-* Version is tracked in `manifest.json`.
-* Minimum Obsidian version compatibility is tracked in `versions.json`.
-* Use `npm version` to bump and update both files consistently.
+- Plugin version lives in `manifest.json` and `package.json`.
+- Minimum supported Obsidian version is declared in `manifest.json` and mapped in `versions.json`.
+- Use `npm run release` scripts or `npm version` to bump consistently.
 
-## Limitations
+See [CHANGELOG.md](./CHANGELOG.md) for a human-readable history of updates.
 
-* Requires desktop Obsidian (uses `FileSystemAdapter`).
-* No built-in security: all scripts are executed as-is.
-  Only run code you trust.
-
-## Project Structure
+## Project structure
 
 ```
 obsidian-scrippets/
-├── main.ts / main.js          # Plugin entry (compiled)
-├── manifest.json / versions.json
+├── src/                # TypeScript sources
+│   ├── main.ts         # Plugin entry
+│   ├── scrippet-manager.ts
+│   ├── metadata.ts
+│   └── ui/             # Settings UI and modals
+├── esbuild.config.mjs
+├── tsconfig.json
+├── manifest.json
+├── versions.json
 ├── styles.css
-├── esbuild.config.mjs / tsconfig.json
-├── package.json / package-lock.json
-└── AGENTS.md                  # Development guidelines
+└── package.json
 ```
 
 ## References
 
-* [Obsidian API docs](https://docs.obsidian.md)
-* [Sample plugin](https://github.com/obsidianmd/obsidian-sample-plugin)
+- [Obsidian API docs](https://docs.obsidian.md)
+- [Sample plugin](https://github.com/obsidianmd/obsidian-sample-plugin)
+- [Developer policies](https://docs.obsidian.md/Developer+policies)

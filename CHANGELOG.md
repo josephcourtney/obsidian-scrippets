@@ -1,0 +1,30 @@
+# Changelog
+
+All notable changes to this project will be documented in this file. Dates use the ISO 8601 format (YYYY-MM-DD).
+
+## [1.1.0] - 2025-09-22
+### Added
+- Vault-based scrippet manager with metadata parsing, hot reload, and per-script enablement.
+- Settings tab with folder selection, startup opt-in, command toggles, manual run, and creation dialog.
+- Confirmation modals for first-run execution and startup enablement warnings.
+- Styles for warning blocks and modals, plus comprehensive example scripts for every supported export shape.
+
+### Changed
+- Plugin now bundles TypeScript sources from `src/` with TypeScript 5, esbuild, and bundler module resolution.
+- Startup scripts run only when explicitly enabled; failures surface via notices without halting other scripts.
+- Plugin is now mobile-compatible by replacing Node `fs` usage with the vault adapter.
+
+### Removed
+- Desktop-only restriction caused by FileSystemAdapter-dependent file access.
+
+## [1.0.1] - 2023-??-??
+### Fixed
+- Minor adjustments and bug fixes following the initial release.
+
+## [1.0.0] - 2023-??-??
+### Added
+- Initial release with basic command loading and startup script execution.
+
+[1.1.0]: https://github.com/josephcourtney/obsidian-scrippets/releases/tag/1.1.0
+[1.0.1]: https://github.com/josephcourtney/obsidian-scrippets/releases/tag/1.0.1
+[1.0.0]: https://github.com/josephcourtney/obsidian-scrippets/releases/tag/1.0.0
