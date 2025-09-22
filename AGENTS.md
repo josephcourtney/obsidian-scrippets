@@ -60,7 +60,6 @@ Rules defined in `eslint.config.mjs`.
 ## Tooling Requirements
 
 - `npm run build` must pass with no type errors.
-- `npx eslint ./src` must pass.
 - Do not add dependencies without inline justification.
 
 ---
@@ -122,7 +121,7 @@ Ensure:
 
 ## Commit Standards
 
-- All commits must pass `npm run build` and `npx eslint ./src`.
+- All commits must pass `npm run build`.
 - Use conventional commits:
 
   - `feat: add startup toggle to settings`
@@ -140,7 +139,8 @@ Ensure:
 - Update `CHANGELOG.md` and append to `versions.json`.
 - Run `npm run build` before packaging.
 - Release artifacts: `main.js`, `manifest.json`, `styles.css`.
-- Tag release with version `x.y.z`.
+- Use `npm run release -- --type=patch|minor|major` (or `--version=x.y.z`) to build, bump, push, and create the GitHub release.
+- Authenticate with `gh auth login`; pass `--no-publish` if you only need the tag.
 
 ---
 
