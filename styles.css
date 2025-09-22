@@ -1,8 +1,42 @@
-/*
+.scrippet-warning {
+  margin: 12px 0;
+  padding: 12px 14px;
+  border-left: 3px solid var(--color-orange);
+  background: rgba(255, 165, 0, 0.08);
+  border-radius: 4px;
+}
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
+.scrippet-warning strong {
+  display: block;
+  margin-bottom: 4px;
+}
 
-If your plugin does not need CSS, delete this file.
+.scrippet-warning ul,
+.scrippet-error ul {
+  margin: 6px 0 0 18px;
+  padding: 0;
+}
 
-*/
+.scrippet-error {
+  margin: 12px 0;
+  padding: 12px 14px;
+  border-left: 3px solid var(--interactive-accent);
+  background: rgba(244, 67, 54, 0.1);
+  border-radius: 4px;
+}
+
+.scrippet-list .setting-item {
+  border-radius: 6px;
+}
+
+.scrippet-list .setting-item + .setting-item {
+  margin-top: 6px;
+}
+
+.scrippet-confirm-warning {
+  color: var(--text-warning);
+}
+
+.scrippet-confirm-modal .setting-item {
+  justify-content: flex-end;
+}
