@@ -1,10 +1,10 @@
 {
-  "id": "obsidian-scrippets",
-  "name": "Scrippets",
-  "version": "1.0.0",
-  "minAppVersion": "0.15.0",
-  "description": "Simple Custom Javascript Command Loader",
-  "author": "Joseph Courtney",
-  "authorUrl": "https://github.com/josephcourtney/obsidian-scrippets",
-  "isDesktopOnly": true
+	"id": "obsidian-scrippets",
+	"name": "Scrippets",
+	"version": "1.0.1",
+	"minAppVersion": "0.15.0",
+	"description": "Simple Custom Javascript Command Loader",
+	"author": "Joseph Courtney",
+	"authorUrl": "https://github.com/josephcourtney/obsidian-scrippets",
+	"isDesktopOnly": true
 }
