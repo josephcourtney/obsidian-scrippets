@@ -1,23 +1,49 @@
-# Obsidian Scrippets plugin
+## Purpose
 
-## Project overview
+This file defines how You, an AI coding agent (LLMs, autonomous dev tools, etc.), must operate when contributing to this project.
+
+## Role
+
+Your responsibilities include:
+
+- Editing TypeScript source files under `src/`
+- Maintaining UI components under `src/ui/`
+- Preserving determinism, testability, and extensibility in scrippet execution
+- Respecting existing plugin lifecycle and Obsidian API conventions
+- Updating `manifest.json`, `package.json`, `versions.json`, and `CHANGELOG.md` consistently for releases
+
+---
+
+## Project Overview
 
 - Target: Obsidian Scrippets plugin (TypeScript → bundled JavaScript).
 - Entry point: `src/main.ts`, bundled to `main.js` and loaded by Obsidian.
 - Release artifacts: `main.js`, `manifest.json`, and optional `styles.css` at the plugin root.
 
-## Environment & tooling
+---
 
-- Node.js: use current LTS (≥ 18).
-- Package manager: **npm** (scripts defined in `package.json`).
-- Bundler: **esbuild** driven by `esbuild.config.mjs`.
+## Directory Constraints
+
+- Source code: `src/`
+- UI components: `src/ui/`
+- Examples: `examples/`
+- Release artifacts: `manifest.json`, `styles.css`, `versions.json`, `CHANGELOG.md`
+- Do not commit or modify: `node_modules/`, `main.js`, or other build outputs
+
+---
+
+## Environment & Tooling
+
+- Node.js: current LTS (≥ 18).
+- Package manager: **npm**.
+- Bundler: **esbuild** via `esbuild.config.mjs`.
 - Type definitions: `obsidian@1.8.7` pinned in `devDependencies`.
 
-### Install / build
+### Install / Build
 
 ```bash
 npm install          # install dependencies
-npm run dev          # watch + rebuild on changes
+npm run dev          # watch + rebuild
 npm run build        # tsc --noEmit (TS 5) + esbuild production bundle
 ```
 
@@ -27,65 +53,136 @@ npm run build        # tsc --noEmit (TS 5) + esbuild production bundle
 npx eslint ./src
 ```
 
-Adjust rules in `eslint.config.mjs` if needed.
+Rules defined in `eslint.config.mjs`.
 
-## Source layout & conventions
+---
 
-- All TypeScript lives in `src/`.
-- Keep `src/main.ts` focused on lifecycle (load settings, wire up manager, register UI).
-- Core modules:
-  - `scrippet-manager.ts`: vault-based loader, metadata parsing, command registration, hot reload.
-  - `scrippet-loader.ts`: sandboxed `new Function` evaluator supporting class, CommonJS, or `invoke` exports.
-  - `metadata.ts`: comment directive parsing (`@name`, `@id`, `@desc`).
-  - `types.ts`: shared types and persisted settings defaults.
-  - `ui/`: settings tab, add-scrippet modal, confirmation dialogs.
-- Examples demonstrating supported export shapes live in `examples/`.
-- `styles.css` holds scoped styling for notices, warnings, and modals.
-- Do not commit build outputs (`main.js`) or `node_modules/`.
+## Tooling Requirements
 
-## Manifest rules (`manifest.json`)
+- `npm run build` must pass with no type errors.
+- `npx eslint ./src` must pass.
+- Do not add dependencies without inline justification.
+
+---
+
+## Behavior Constraints
+
+- Use Obsidian vault adapter APIs (`adapter.list/read/create`) instead of `fs`.
+- Always normalize paths with `normalizePath`.
+- Keep metadata parsing deterministic (`@id`, `@name`, `@desc`).
+- Surface errors via `Notice`; never fail silently.
+- Avoid blocking `onload`; always use async vault I/O.
+- Debounce file-system events to avoid redundant reloads.
+- Do not introduce non-determinism (e.g., random startup execution unless explicitly toggled).
+
+---
+
+## Source Layout & Conventions
+
+- `src/main.ts`: lifecycle only (load settings, wire up manager, register UI).
+- `scrippet-manager.ts`: vault loader, metadata parsing, commands, hot reload.
+- `scrippet-loader.ts`: sandboxed evaluator (`new Function`), supports CommonJS/class/`invoke`.
+- `metadata.ts`: directive parsing (`@name`, `@id`, `@desc`).
+- `types.ts`: shared types and settings defaults.
+- `ui/`: settings tab, modals, dialogs.
+- `examples/`: valid export shapes.
+- `styles.css`: scoped notices, warnings, modals.
+
+---
+
+## Manifest Rules (`manifest.json`)
 
 - Required keys: `id`, `name`, `version`, `minAppVersion`, `description`, `isDesktopOnly`.
 - Keep `minAppVersion` aligned with tested APIs (currently `1.5.0`).
 - Never change `id` after release.
-- Ensure versions in `manifest.json`, `package.json`, and `versions.json` match.
+- Ensure versions in `manifest.json`, `package.json`, `versions.json` match.
 
-## Testing
+---
 
-Manual install by copying artifacts into `<Vault>/.obsidian/plugins/obsidian-scrippets/`, then reload Obsidian and enable the plugin under **Settings → Community plugins**.
+## Logging & Progress Tracking
 
-## Commands & settings
+### Changelog Maintenance
 
-- Register commands through `ScrippetManager` (per-file commands generated from metadata/filename).
-- Persist configuration via `this.loadData()` / `this.saveData()`; settings schema is defined in `types.ts`.
-- Settings UI provides folder selection, startup opt-in, per-script toggles, manual run, and creation dialog.
+Follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## Versioning & releases
+- Example heading: `## [1.2.3] - 2025-09-22`
+- Allowed sections: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`
+- Each bullet:
 
-- Bump versions in `manifest.json`, `package.json`, and append to `versions.json`.
-- Document changes in `CHANGELOG.md`.
-- `npm run build` before packaging; upload `main.js`, `manifest.json`, `styles.css` with the release tag `x.y.z`.
+  - Lowercase imperative verb (e.g., “add”, “fix”)
+  - Markdown syntax
 
-## Security & compliance
+Ensure:
 
-- Scrippets execute arbitrary JavaScript; surface warnings in UI and documentation.
-- Use vault adapter APIs (`adapter.list/read/create`) instead of desktop-only `fs`.
-- No telemetry or network access without explicit opt-in and disclosure.
-- Always register event listeners/intervals via plugin helpers to ensure cleanup.
+- `CHANGELOG.md` reflects code changes
+- Versions updated in `manifest.json`, `package.json`, `versions.json`
+- Historical entries never modified
 
-## Performance guidelines
+---
 
-- Avoid blocking `onload`; rely on async vault IO and `Promise.all` batching in `ScrippetManager`.
-- Debounce file-system events (see `scheduleReload`) to prevent redundant reloads.
-- Defer startup script execution unless the user enables the toggle.
+## Commit Standards
 
-## Coding tips
+- All commits must pass `npm run build` and `npx eslint ./src`.
+- Use conventional commits:
 
-- TypeScript `strict` mode is enabled; address type errors rather than casting away.
-- Prefer `async/await` and wrap user script execution in try/catch to surface errors via `Notice`.
-- Keep modules focused and under ~300 lines; break out helpers when necessary.
+  - `feat: add startup toggle to settings`
+  - `fix: debounce file reload events`
+  - `refactor: extract metadata parser`
+- Before a release:
 
-## Sample operations
+  - Bump versions in `manifest.json`, `package.json`, `versions.json`
+  - Update `CHANGELOG.md`
+
+---
+
+## Versioning & Releases
+
+- Update `CHANGELOG.md` and append to `versions.json`.
+- Run `npm run build` before packaging.
+- Release artifacts: `main.js`, `manifest.json`, `styles.css`.
+- Tag release with version `x.y.z`.
+
+---
+
+## Security & Compliance
+
+- Scrippets execute arbitrary JavaScript → warnings required in UI and docs.
+- No telemetry or network access without explicit opt-in.
+- Register all event listeners/intervals via plugin helpers for cleanup.
+
+---
+
+## Performance Guidelines
+
+- Avoid blocking `onload`; use async and `Promise.all` batching.
+- Debounce reload events.
+- Defer startup script execution unless user enables it.
+
+---
+
+## Prohibited Behavior
+
+- Do not commit `main.js` or `node_modules/`.
+- Do not modify `manifest.json.id`.
+- Do not reduce or silence warnings about unsafe scripts.
+- Do not bypass vault adapter APIs.
+- Do not introduce non-determinism in scrippet loading.
+
+---
+
+## Assumptions & Compliance
+
+- Each task starts with only the current repo state.
+- Always re-read `CHANGELOG.md`, `manifest.json`, and `versions.json` before modifying.
+- If lacking shell/build execution:
+
+  - Emit Markdown patch with proposed edits.
+  - Describe expected outputs of toolchain commands.
+  - Wait for user confirmation before proceeding.
+
+---
+
+# Appendix A — Sample Operations
 
 ### Create a scrippet programmatically
 
@@ -110,12 +207,16 @@ export async function createDemo(plugin: ScrippetPlugin) {
 await plugin.manager.reload({ runStartup: plugin.settings.runStartupOnLoad });
 ```
 
-## Troubleshooting
+---
 
-- Missing commands: ensure metadata IDs are unique; duplicates are reported in the settings UI under “Skipped”.
-- Startup failures: errors appear as Notices and in the log; scripts continue loading after failures.
-- Build errors: run `npm run build` to type-check and bundle; confirm `tsconfig.json` points to `src/**/*.ts`.
-- Mobile: set `isDesktopOnly` to `false` and avoid desktop APIs—already enforced via vault adapter usage.
+# Appendix B — Troubleshooting
+
+- **Missing commands:** ensure metadata IDs are unique; duplicates appear in settings under “Skipped”.
+- **Startup failures:** errors appear as Notices and in the log; loading continues after failures.
+- **Build errors:** run `npm run build`; confirm `tsconfig.json` points to `src/**/*.ts`.
+- **Mobile:** set `isDesktopOnly` to `false`; avoid desktop APIs.
+
+---
 
 ## References
 
