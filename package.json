@@ -6,7 +6,13 @@
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
-    "version": "node version-bump.mjs && git add manifest.json versions.json"
+    "version": "node version-bump.mjs && git add manifest.json versions.json",
+    "prepublish:assets": "node -e \"const fs=require('fs');if(!fs.existsSync('main.js')){process.exitCode=1;throw new Error('Run npm run build first');}\"",
+    "release": "npm run build && npm run release:tag --",
+    "release:tag": "node -e \"const v=process.argv[1]; if(!v){throw new Error('Usage: npm run release -- X.Y.Z');} process.exit(0)\" && npm version",
+    "release:push": "git push origin HEAD:main && git push --tags",
+    "release:publish": "gh release create $(node -p \"require('./manifest.json').version\") main.js manifest.json $(node -e \"const fs=require('fs');process.stdout.write(fs.existsSync('styles.css')?'styles.css':'')\") --title $(node -p \"require('./manifest.json').version\") --notes \"Release $(node -p \\\"require('./manifest.json').version\\\")\"",
+    "release:all": "npm run release -- $npm_config_ver && npm run release:push && npm run release:publish"
   },
   "keywords": [],
   "author": "",
