@@ -28,6 +28,17 @@ This creates a command **Scrippet: hello** in the Obsidian command palette.
 
 ## Installation
 
+### Option 1: Install via BRAT (Beta Reviewer's Auto-update Tool)
+
+1. Install and enable the [Obsidian42 - BRAT](https://github.com/TfTHacker/obsidian42-brat) plugin from the community plugins browser.
+2. In BRAT settings, choose **Add Beta plugin**.
+3. Enter this repository's URL:
+   `
+   https://github.com/josephcourtney/obsidian-scrippets
+   `
+4. BRAT will clone the repository and keep it updated automatically.
+
+### Option 2: Manual installation
 1. Build the plugin:
 
    ```bash
