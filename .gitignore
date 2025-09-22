@@ -1,0 +1,34 @@
+# obsidian
+data.json
+
+# Node.js dependencies
+node_modules/
+
+# Build artifacts
+main.js
+dist/
+*.tsbuildinfo
+
+# Exclude sourcemaps
+*.map
+
+# Logs npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+*.code-workspace
+
+# Environment / lock
+.env
+.env
+
+
+
