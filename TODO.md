@@ -1,29 +1,29 @@
 ### High priority
-- [ ] Migrate `scriptStates` keys from file path → stable scrippet id
+- [x] Migrate `scriptStates` keys from file path → stable scrippet id
   - Migrate existing path-based keys on load.
-- [ ] Implement metadata-only scan (no code evaluation)
+- [x] Implement metadata-only scan (no code evaluation)
   - Parse header, and cache metadata separately.
   - Surface runtime errors on first execution with clear notices.
-- [ ] Support incremental reload of only changed files on vault events
+- [x] Support incremental reload of only changed files on vault events
   - Reload only affected file(s) and update state.
   - Continue full reload when changes are complex (e.g., folder rename).
   - Batch changes and coalesce events for efficiency.
-- [ ] Append `//# sourceURL=<path>` to evaluated source for stack traces
+- [x] Append `//# sourceURL=<path>` to evaluated source for stack traces
   - Strip sensitive vault paths in favor of `<vault>/<relative-path>`.
-- [ ] Lazily `loadScrippet` on execution/enable
+- [x] Lazily `loadScrippet` on execution/enable
   - Load on first run only.
   - Cache instances per file until modify/rename.
   - Preload only enabled startup scripts.
-- [ ] Add "Open file" button in settings per scrippet
+- [x] Add "Open file" button in settings per scrippet
   - Open in new tab using Obsidian `app.workspace.openLinkText`.
-- [ ] Add "Copy path" button per scrippet
+- [x] Add "Copy path" button per scrippet
   - Copy vault-relative path.
-- [ ] Show file path, id, and header snippet in first-run confirmation modal
+- [x] Show file path, id, and header snippet in first-run confirmation modal
   - Limit snippet to first 10 lines and highlight directives.
-- [ ] Ensure modals trap focus and set ARIA labels
+- [x] Ensure modals trap focus and set ARIA labels
   - Use Obsidian’s built-in modal helpers.
-- [ ] Add `1.1.1` entry with date and changes to `CHANGELOG.md`
-- [ ] Verify `manifest.json`, `package.json`, `versions.json` versions stay aligned after release
+- [x] Add `1.1.1` entry with date and changes to `CHANGELOG.md`
+- [x] Verify `manifest.json`, `package.json`, `versions.json` versions stay aligned after release
 
 ### Medium priority
 - [ ] Add search/filter bar in settings scrippet list

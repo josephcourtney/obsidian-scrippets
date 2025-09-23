@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. Dates use the ISO 8601 format (YYYY-MM-DD).
 
+## [1.1.1] - 2025-03-05
+### Added
+- Add metadata-first scanning with header previews, first-run context, and accessible modals.
+- Add settings controls to open scrippet files and copy their vault-relative paths.
+
+### Changed
+- Migrate script state tracking to stable scrippet ids with incremental reloads and lazy loading.
+- Append source URLs to evaluated scripts for clearer stack traces and runtime notices.
+
 ## [1.1.0] - 2025-09-22
 ### Added
 - Vault-based scrippet manager with metadata parsing, hot reload, and per-script enablement.
@@ -25,6 +34,7 @@ All notable changes to this project will be documented in this file. Dates use t
 ### Added
 - Initial release with basic command loading and startup script execution.
 
+[1.1.1]: https://github.com/josephcourtney/obsidian-scrippets/releases/tag/1.1.1
 [1.1.0]: https://github.com/josephcourtney/obsidian-scrippets/releases/tag/1.1.0
 [1.0.1]: https://github.com/josephcourtney/obsidian-scrippets/releases/tag/1.0.1
 [1.0.0]: https://github.com/josephcourtney/obsidian-scrippets/releases/tag/1.0.0

@@ -40,3 +40,34 @@
 .scrippet-confirm-modal .setting-item {
   justify-content: flex-end;
 }
+
+.scrippet-run-details {
+  margin-bottom: 8px;
+  font-size: var(--font-small);
+  color: var(--text-muted);
+}
+
+.scrippet-run-details p {
+  margin: 0;
+}
+
+.scrippet-snippet-wrapper {
+  margin: 8px 0 16px;
+  padding: 8px 10px;
+  background: var(--background-secondary);
+  border-radius: 4px;
+  max-height: 240px;
+  overflow: auto;
+}
+
+.scrippet-snippet {
+  margin: 0;
+  font-family: var(--font-monospace);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.scrippet-snippet mark {
+  background: var(--background-modifier-accent);
+  color: inherit;
+}

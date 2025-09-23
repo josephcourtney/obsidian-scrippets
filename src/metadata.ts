@@ -32,6 +32,15 @@ export function parseScrippetMetadata(source: string): ParsedMetadata {
   return { metadata, source };
 }
 
+export function buildHeaderSnippet(source: string, maxLines = 10): string {
+  const lines = source.split(/\r?\n/).slice(0, maxLines);
+  if (lines.length === 0) return "";
+  return lines
+    .map((line) => escapeHtml(line))
+    .map((line) => line.replace(/(@[\w-]+)(\s*:\s*)/g, '<mark>$1</mark>$2'))
+    .join("<br>");
+}
+
 export function toDisplayName(filename: string, metadata: ScrippetMetadata): string {
   if (metadata.name) return metadata.name.trim();
   const base = getBasename(filename);
@@ -56,4 +65,13 @@ export function slugify(value: string): string {
     .trim()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
