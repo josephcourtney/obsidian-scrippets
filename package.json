@@ -1,6 +1,6 @@
 {
   "name": "obsidian-scrippets",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Run and manage custom JavaScript scrippets from your vault.",
   "main": "main.js",
   "scripts": {
