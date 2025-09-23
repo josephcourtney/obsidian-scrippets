@@ -1,8 +1,10 @@
 import { App, Modal, Setting } from "obsidian";
+import { applyModalAccessibility } from "./accessibility";
 
 export class StartupWarningModal extends Modal {
   private resolver!: (result: boolean) => void;
   private resolved = false;
+  private cleanupAccessibility: (() => void) | null = null;
 
   constructor(app: App) {
     super(app);
@@ -24,24 +26,33 @@ export class StartupWarningModal extends Modal {
       text: "They can modify or delete any file in your vault and run without additional confirmation.",
       cls: "scrippet-confirm-warning",
     });
-
     const buttons = new Setting(this.contentEl);
-    buttons.addButton((btn) =>
+    let cancelEl: HTMLElement | undefined;
+    buttons.addButton((btn) => {
+      cancelEl = btn.buttonEl;
       btn
         .setButtonText("Cancel")
         .setWarning()
-        .onClick(() => this.resolve(false)),
-    );
+        .onClick(() => this.resolve(false));
+    });
     buttons.addButton((btn) =>
       btn
         .setButtonText("Enable")
         .setCta()
         .onClick(() => this.resolve(true)),
     );
+
+    this.cleanupAccessibility = applyModalAccessibility(this, {
+      initialFocus: cancelEl,
+    });
   }
 
   onClose(): void {
     if (!this.resolved) this.resolver(false);
+    if (this.cleanupAccessibility) {
+      this.cleanupAccessibility();
+      this.cleanupAccessibility = null;
+    }
     this.contentEl.empty();
   }
 

@@ -1,12 +1,6 @@
-import {
-  App,
-  Notice,
-  PluginSettingTab,
-  Setting,
-  normalizePath,
-} from "obsidian";
+import { App, Notice, PluginSettingTab, Setting, TFile, normalizePath } from "obsidian";
 import type ScrippetPlugin from "../main";
-import type { LoadedScrippet } from "../types";
+import type { ScrippetDescriptor } from "../types";
 import { AddScrippetModal } from "./add-scrippet-modal";
 import { StartupWarningModal } from "./startup-warning-modal";
 
@@ -124,7 +118,7 @@ export class ScrippetSettingTab extends PluginSettingTab {
 function renderList(
   container: HTMLElement,
   heading: string,
-  scripts: LoadedScrippet[],
+  scripts: ScrippetDescriptor[],
   plugin: ScrippetPlugin,
   startup = false,
 ): void {
@@ -142,10 +136,38 @@ function renderList(
 
     setting.addToggle((toggle) =>
       toggle.setValue(script.enabled).onChange(async (value) => {
-        plugin.manager.toggleDescriptor(script, value);
-        await plugin.saveSettings();
-        await plugin.manager.reload({ runStartup: false });
+        await plugin.manager.toggleDescriptor(script, value);
       }),
+    );
+
+    setting.addExtraButton((btn) =>
+      btn
+        .setIcon("copy")
+        .setTooltip("Copy path")
+        .onClick(async () => {
+          const path = normalizePath(script.path);
+          try {
+            await navigator.clipboard.writeText(path);
+            new Notice("Scrippet path copied.");
+          } catch (error) {
+            console.error("Scrippets: unable to copy path", error);
+            new Notice("Failed to copy path.");
+          }
+        }),
+    );
+
+    setting.addExtraButton((btn) =>
+      btn
+        .setIcon("file")
+        .setTooltip("Open file")
+        .onClick(async () => {
+          const file = plugin.app.vault.getAbstractFileByPath(script.path);
+          if (!(file instanceof TFile)) {
+            new Notice("Scrippet file not found.");
+            return;
+          }
+          await plugin.app.workspace.getLeaf(true).openFile(file);
+        }),
     );
 
     if (!startup) {
@@ -156,14 +178,14 @@ function renderList(
           .setDisabled(!script.enabled)
           .onClick(async () => {
             if (!script.enabled) return;
-            await plugin.manager.executeFromPath(script.path);
+            await plugin.manager.executeById(script.id);
           }),
       );
     }
   }
 }
 
-function buildDescription(script: LoadedScrippet): string {
+function buildDescription(script: ScrippetDescriptor): string {
   const parts = [] as string[];
   if (script.description) parts.push(script.description);
   parts.push(`ID: ${script.id}`);

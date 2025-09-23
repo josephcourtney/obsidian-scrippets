@@ -15,9 +15,9 @@ export interface ScrippetDescriptor {
   description?: string;
   path: string;
   kind: ScrippetKind;
-  source: string;
   metadata: ScrippetMetadata;
   enabled: boolean;
+  headerSnippet: string;
 }
 
 export interface ScriptPreference {
@@ -55,8 +55,8 @@ export interface ScrippetLoadError {
 }
 
 export interface ScrippetScanResult {
-  commands: LoadedScrippet[];
-  startup: LoadedScrippet[];
+  commands: ScrippetDescriptor[];
+  startup: ScrippetDescriptor[];
   errors: ScrippetLoadError[];
   skipped: string[];
 }
