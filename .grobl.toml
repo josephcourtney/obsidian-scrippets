@@ -2,6 +2,13 @@
 # Files/folders whose *presence* isn't helpful
 # ============================================
 exclude_tree = [
+  # --------------- project-specific ---------------
+  "data.json",
+  "main.js",
+  "dist/*",
+  "*.tsbuildinfo",
+  "package-lock.json",
+
   # ---------------- grobl-specific ----------------
   ".grobl.toml",
 

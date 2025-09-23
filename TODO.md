@@ -1,2 +1,82 @@
-- [ ] add an icon button to copy the full path to the scrippets directory
-- [ ] add an icon button next to each scrippets to copy its full path
+### High priority
+- [ ] Migrate `scriptStates` keys from file path → stable scrippet id
+  - Migrate existing path-based keys on load.
+- [ ] Implement metadata-only scan (no code evaluation)
+  - Parse header, and cache metadata separately.
+  - Surface runtime errors on first execution with clear notices.
+- [ ] Support incremental reload of only changed files on vault events
+  - Reload only affected file(s) and update state.
+  - Continue full reload when changes are complex (e.g., folder rename).
+  - Batch changes and coalesce events for efficiency.
+- [ ] Append `//# sourceURL=<path>` to evaluated source for stack traces
+  - Strip sensitive vault paths in favor of `<vault>/<relative-path>`.
+- [ ] Lazily `loadScrippet` on execution/enable
+  - Load on first run only.
+  - Cache instances per file until modify/rename.
+  - Preload only enabled startup scripts.
+- [ ] Add "Open file" button in settings per scrippet
+  - Open in new tab using Obsidian `app.workspace.openLinkText`.
+- [ ] Add "Copy path" button per scrippet
+  - Copy vault-relative path.
+- [ ] Show file path, id, and header snippet in first-run confirmation modal
+  - Limit snippet to first 10 lines and highlight directives.
+- [ ] Ensure modals trap focus and set ARIA labels
+  - Use Obsidian’s built-in modal helpers.
+- [ ] Add `1.1.1` entry with date and changes to `CHANGELOG.md`
+- [ ] Verify `manifest.json`, `package.json`, `versions.json` versions stay aligned after release
+
+### Medium priority
+- [ ] Add search/filter bar in settings scrippet list
+  - Simple text filter only.
+  - Update in real time.
+- [ ] Add sort options (name, last modified, enabled) in settings list
+  - Single active sort with persisted preference.
+- [ ] Show duplicate-id conflicts inline with rename suggestion
+  - Auto-suggest unique IDs and provide rename button.
+- [ ] Add per-scrippet hotkey registration link in settings
+  - Deep-link to Obsidian hotkey settings.
+- [ ] Support `.mjs` and `.cjs` file extensions
+  - Configurable allowed extensions.
+- [ ] Support YAML front-matter metadata in addition to header comments
+  - Merge YAML and header values, **YAML has precedence**.
+  - Use a YAML parser.
+- [ ] Batch vault events for reload and improve debounce
+  - Adaptive debounce with a single timer; increase delay under heavy churn.
+- [ ] Cache adapter.read results during scans
+  - Cache per scan cycle only.
+  - Invalidate cache on file modify event.
+- [ ] Enable source maps in dev builds only
+- [ ] Add `npm run check` script (tsc + eslint)
+- [ ] Strengthen ESLint config (TypeScript rules, no-floating-promises)
+- [ ] Add Prettier formatting integration
+- [ ] Add an icon button to copy the full path to the scrippets directory
+  - Copy vault-relative directory.
+  - Show button in settings header.
+- [ ] Add "Always trust this folder" option with revert control
+  - Store per-folder in plugin settings with a clear “Revoke trust” control.
+- [ ] Pin eslint configs consistently to v9 or upgrade rules
+  - Upgrade to ESLint v9 fully.
+  - Adapt config to the flat config structure.
+
+### Low priority
+- [ ] Add "Reveal" button per scrippet
+  - Use Obsidian API if available; otherwise open OS explorer to vault-relative path.
+- [ ] Add "Run all startup now" button in settings
+- [ ] Support startup script ordering
+  - Numeric order field in settings with up/down controls; keep filename order as default.
+- [ ] Add per-file startup delay option
+  - Human-readable units stored per file in metadata, overridable in settings.
+- [ ] Add "Dry-run startup (no writes)" toggle
+  - Inject no-op adapter vs. throw errors on write.
+- [ ] Persist a log panel of recent scrippet runs and errors
+  - Truncate to last N entries.
+- [ ] Expose utility module for shared helpers to scrippets
+  - Bundle helpers inside plugin and expose a stable, minimal API.
+- [ ] Document utility module in README
+- [ ] Add advanced example scripts (workspace, file I/O, CSS manipulation)
+- [ ] Add template supporting optional `onload`/`onunload` hooks
+- [ ] Add CI workflow: lint + build + type-check
+- [ ] Add aria-live region for warnings and notices
+- [ ] Use `requestIdleCallback` for non-urgent settings UI refresh
+  - Apply only to settings UI.
+
