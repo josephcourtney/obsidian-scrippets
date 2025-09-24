@@ -26,35 +26,35 @@
 - [x] Verify `manifest.json`, `package.json`, `versions.json` versions stay aligned after release
 
 ### Medium priority
-- [ ] Add search/filter bar in settings scrippet list
+- [x] Add search/filter bar in settings scrippet list
   - Simple text filter only.
   - Update in real time.
-- [ ] Add sort options (name, last modified, enabled) in settings list
+- [x] Add sort options (name, last modified, enabled) in settings list
   - Single active sort with persisted preference.
-- [ ] Show duplicate-id conflicts inline with rename suggestion
+- [x] Show duplicate-id conflicts inline with rename suggestion
   - Auto-suggest unique IDs and provide rename button.
-- [ ] Add per-scrippet hotkey registration link in settings
+- [x] Add per-scrippet hotkey registration link in settings
   - Deep-link to Obsidian hotkey settings.
-- [ ] Support `.mjs` and `.cjs` file extensions
+- [x] Support `.mjs` and `.cjs` file extensions
   - Configurable allowed extensions.
-- [ ] Support YAML front-matter metadata in addition to header comments
+- [x] Support YAML front-matter metadata in addition to header comments
   - Merge YAML and header values, **YAML has precedence**.
   - Use a YAML parser.
-- [ ] Batch vault events for reload and improve debounce
+- [x] Batch vault events for reload and improve debounce
   - Adaptive debounce with a single timer; increase delay under heavy churn.
-- [ ] Cache adapter.read results during scans
+- [x] Cache adapter.read results during scans
   - Cache per scan cycle only.
   - Invalidate cache on file modify event.
-- [ ] Enable source maps in dev builds only
-- [ ] Add `npm run check` script (tsc + eslint)
-- [ ] Strengthen ESLint config (TypeScript rules, no-floating-promises)
-- [ ] Add Prettier formatting integration
-- [ ] Add an icon button to copy the full path to the scrippets directory
+- [x] Enable source maps in dev builds only
+- [x] Add `npm run check` script (tsc + eslint)
+- [x] Strengthen ESLint config (TypeScript rules, no-floating-promises)
+- [x] Add Prettier formatting integration
+- [x] Add an icon button to copy the full path to the scrippets directory
   - Copy vault-relative directory.
   - Show button in settings header.
-- [ ] Add "Always trust this folder" option with revert control
+- [x] Add "Always trust this folder" option with revert control
   - Store per-folder in plugin settings with a clear “Revoke trust” control.
-- [ ] Pin eslint configs consistently to v9 or upgrade rules
+- [x] Pin eslint configs consistently to v9 or upgrade rules
   - Upgrade to ESLint v9 fully.
   - Adapt config to the flat config structure.
 

@@ -11,6 +11,79 @@
   margin-bottom: 4px;
 }
 
+.scrippet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.scrippet-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.scrippet-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  border-radius: 6px;
+  padding: 4px 6px;
+  cursor: pointer;
+  color: inherit;
+}
+
+.scrippet-icon-button:hover {
+  background: var(--interactive-hover);
+}
+
+.scrippet-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 16px 0;
+  align-items: center;
+}
+
+.scrippet-controls input[type="search"] {
+  min-width: 200px;
+  padding: 6px 10px;
+}
+
+.scrippet-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.scrippet-sort-label {
+  font-weight: var(--font-medium);
+}
+
+.scrippet-extension-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.scrippet-extension-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: var(--font-medium);
+}
+
+.scrippet-trusted-folders {
+  margin-top: 8px;
+}
+
+.scrippet-duplicates .setting-item {
+  margin-top: 6px;
+}
+
 .scrippet-warning ul,
 .scrippet-error ul {
   margin: 6px 0 0 18px;
