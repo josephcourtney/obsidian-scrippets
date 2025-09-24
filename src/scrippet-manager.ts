@@ -12,11 +12,13 @@ import {
   parseScrippetMetadata,
   toDisplayName,
   toIdentifier,
+  updateScrippetId,
 } from "./metadata";
 import { loadScrippet } from "./scrippet-loader";
 import { confirmFirstRun } from "./ui/confirm-run-modal";
 import type {
   LoadedScrippet,
+  ScrippetDuplicate,
   ScrippetDescriptor,
   ScrippetLoadError,
   ScrippetPluginSettings,
@@ -58,15 +60,22 @@ export class ScrippetManager {
   private descriptorsById = new Map<string, ScrippetDescriptor>();
   private listeners = new Set<() => void>();
   private reloadTimer: number | null = null;
+  private reloadDelay = 200;
+  private baseReloadDelay = 200;
+  private maxReloadDelay = 1000;
+  private changeBurst = 0;
+  private lastChangeAt = 0;
   private pendingChanges: PendingChanges = createPendingChanges();
   private settingsDirty = false;
   private errorMap = new Map<string, string>();
-  private skipped = new Set<string>();
+  private duplicates = new Map<string, ScrippetDuplicate>();
+  private readCache = new Map<string, string>();
+  private cacheActive = false;
   private lastScan: ScrippetScanResult = {
     commands: [],
     startup: [],
     errors: [],
-    skipped: [],
+    duplicates: [],
   };
 
   constructor(plugin: ScrippetHost) {
@@ -132,6 +141,28 @@ export class ScrippetManager {
     await this.flushSettings();
   }
 
+  getCommandId(id: string): string {
+    return `${COMMAND_PREFIX}:${id}`;
+  }
+
+  async renameScrippetId(path: string, previousId: string, newId: string): Promise<void> {
+    const normalized = normalizePath(path);
+    const adapter = this.plugin.app.vault.adapter;
+    const source = await this.readFile(normalized, false);
+    const updated = updateScrippetId(source, newId);
+    if (updated === source) return;
+    await adapter.write(normalized, updated);
+    this.invalidateCachedPath(normalized);
+    if (previousId !== newId) {
+      this.descriptorsById.delete(previousId);
+      this.instanceCache.delete(previousId);
+    }
+    await this.refreshDescriptor(normalized);
+    await this.flushSettings();
+    this.updateLastScan();
+    this.notify();
+  }
+
   private get baseFolder(): string {
     return normalizePath(this.plugin.settings.folder || DEFAULT_SETTINGS.folder);
   }
@@ -146,9 +177,9 @@ export class ScrippetManager {
     this.descriptorsByPath.clear();
     this.descriptorsById.clear();
     this.errorMap.clear();
-    this.skipped.clear();
+    this.duplicates.clear();
 
-    const result = await this.scanScrippets();
+    const result = await this.withReadCache(() => this.scanScrippets());
 
     for (const descriptor of result.commands) {
       this.storeDescriptor(descriptor);
@@ -161,7 +192,7 @@ export class ScrippetManager {
     for (const error of result.errors) {
       this.errorMap.set(error.path, error.message);
     }
-    this.skipped = new Set(result.skipped);
+    this.duplicates = new Map(result.duplicates.map((dup) => [normalizePath(dup.path), dup]));
 
     this.updateLastScan();
 
@@ -191,7 +222,7 @@ export class ScrippetManager {
       return;
     }
 
-    if (this.plugin.settings.confirmBeforeFirstRun && !prefs.hasRun) {
+    if (this.shouldConfirmFirstRun(descriptor) && !prefs.hasRun) {
       const confirmed = await confirmFirstRun(this.plugin.app, descriptor);
       if (!confirmed) return;
     }
@@ -242,6 +273,16 @@ export class ScrippetManager {
     scriptStates[idKey] = preference;
     this.settingsDirty = true;
     return preference;
+  }
+
+  private shouldConfirmFirstRun(descriptor: ScrippetDescriptor): boolean {
+    if (!this.plugin.settings.confirmBeforeFirstRun) return false;
+    return !this.isTrusted(descriptor.path);
+  }
+
+  private isTrusted(path: string): boolean {
+    const normalized = normalizePath(path);
+    return this.plugin.settings.trustedFolders.some((folder) => isWithin(normalized, folder));
   }
 
   private async ensureFolders(): Promise<void> {
@@ -315,8 +356,7 @@ export class ScrippetManager {
   private async loadDescriptorInstance(descriptor: ScrippetDescriptor): Promise<LoadedScrippet> {
     const cached = this.instanceCache.get(descriptor.id);
     if (cached) return cached;
-    const adapter = this.plugin.app.vault.adapter;
-    const source = await adapter.read(descriptor.path);
+    const source = await this.readFile(descriptor.path, false);
     const instance = loadScrippet(this.plugin, appendSourceUrl(source, descriptor.path));
     const loaded: LoadedScrippet = {
       ...descriptor,
@@ -336,25 +376,25 @@ export class ScrippetManager {
   }
 
   private async scanScrippets(): Promise<ScrippetScanResult> {
-    const commandFiles = await this.listJsFiles(this.baseFolder, (path) => !isWithin(path, this.startupFolder));
-    const startupFiles = await this.listJsFiles(this.startupFolder);
+    const commandFiles = await this.listScriptFiles(this.baseFolder, (path) => !isWithin(path, this.startupFolder));
+    const startupFiles = await this.listScriptFiles(this.startupFolder);
 
     const errors: ScrippetLoadError[] = [];
-    const skipped: string[] = [];
+    const duplicates: ScrippetDuplicate[] = [];
     const commandDescriptors: ScrippetDescriptor[] = [];
     const startupDescriptors: ScrippetDescriptor[] = [];
     const processedIds = new Set<string>();
 
     await Promise.all(
       commandFiles.map(async (path) => {
-        const descriptor = await this.tryBuildDescriptor(path, "command", processedIds, errors, skipped);
+        const descriptor = await this.tryBuildDescriptor(path, "command", processedIds, errors, duplicates);
         if (descriptor) commandDescriptors.push(descriptor);
       }),
     );
 
     await Promise.all(
       startupFiles.map(async (path) => {
-        const descriptor = await this.tryBuildDescriptor(path, "startup", processedIds, errors, skipped);
+        const descriptor = await this.tryBuildDescriptor(path, "startup", processedIds, errors, duplicates);
         if (descriptor) startupDescriptors.push(descriptor);
       }),
     );
@@ -366,7 +406,7 @@ export class ScrippetManager {
       commands: commandDescriptors,
       startup: startupDescriptors,
       errors,
-      skipped,
+      duplicates,
     };
   }
 
@@ -375,11 +415,10 @@ export class ScrippetManager {
     kind: ScrippetKind,
     processedIds: Set<string>,
     errors: ScrippetLoadError[],
-    skipped: string[],
+    duplicates: ScrippetDuplicate[],
   ): Promise<ScrippetDescriptor | null> {
     try {
-      const adapter = this.plugin.app.vault.adapter;
-      const src = await adapter.read(path);
+      const src = await this.readFile(path);
       const { metadata } = parseScrippetMetadata(src);
       const id = toIdentifier(path, metadata);
       if (!id) {
@@ -388,7 +427,8 @@ export class ScrippetManager {
       }
       if (processedIds.has(id)) {
         errors.push({ path, message: `Duplicate scrippet id "${id}"` });
-        skipped.push(path);
+        const suggestion = this.generateIdSuggestion(id, processedIds);
+        duplicates.push({ path, id, suggestion });
         return null;
       }
       processedIds.add(id);
@@ -396,6 +436,7 @@ export class ScrippetManager {
       const name = toDisplayName(path, metadata);
       const description = metadata.description ?? metadata.desc;
       const preference = this.ensurePreference(id, path);
+      const modified = await this.getModifiedTime(path);
 
       const descriptor: ScrippetDescriptor = {
         id,
@@ -406,6 +447,7 @@ export class ScrippetManager {
         metadata,
         enabled: preference.enabled,
         headerSnippet: buildHeaderSnippet(src),
+        modified,
       };
       return descriptor;
     } catch (error) {
@@ -414,12 +456,12 @@ export class ScrippetManager {
     }
   }
 
-  private async listJsFiles(folder: string, filter?: (path: string) => boolean): Promise<string[]> {
+  private async listScriptFiles(folder: string, filter?: (path: string) => boolean): Promise<string[]> {
     const adapter = this.plugin.app.vault.adapter;
     try {
       const listing = await adapter.list(folder);
       const files = listing.files
-        .filter((file) => file.toLowerCase().endsWith(".js"))
+        .filter((file) => this.isAllowedExtension(file))
         .map((file) => normalizePath(file))
         .filter((file) => (filter ? filter(file) : true));
       return files;
@@ -427,6 +469,11 @@ export class ScrippetManager {
       console.debug(`Scrippets: unable to list ${folder}`, error);
       return [];
     }
+  }
+
+  private isAllowedExtension(path: string): boolean {
+    const lower = normalizePath(path).toLowerCase();
+    return this.plugin.settings.allowedExtensions.some((ext) => lower.endsWith(ext.toLowerCase()));
   }
 
   private registerWatchers(): void {
@@ -471,12 +518,28 @@ export class ScrippetManager {
 
   private queueChange(change: QueuedChange): void {
     this.registerChange(change);
-    if (this.reloadTimer == null) {
-      this.reloadTimer = window.setTimeout(() => {
-        this.reloadTimer = null;
-        void this.processPendingChanges();
-      }, 200);
+    if (change.path) this.invalidateCachedPath(change.path);
+
+    const now = Date.now();
+    if (now - this.lastChangeAt < 500) {
+      this.changeBurst += 1;
+      this.reloadDelay = Math.min(this.maxReloadDelay, this.baseReloadDelay + this.changeBurst * 100);
+    } else {
+      this.changeBurst = 1;
+      this.reloadDelay = this.baseReloadDelay;
     }
+    this.lastChangeAt = now;
+
+    if (this.reloadTimer != null) {
+      window.clearTimeout(this.reloadTimer);
+    }
+
+    this.reloadTimer = window.setTimeout(() => {
+      this.reloadTimer = null;
+      this.changeBurst = 0;
+      this.reloadDelay = this.baseReloadDelay;
+      void this.processPendingChanges();
+    }, this.reloadDelay);
   }
 
   private registerChange(change: QueuedChange): void {
@@ -484,6 +547,7 @@ export class ScrippetManager {
       this.pendingChanges.full = true;
       this.pendingChanges.changed.clear();
       this.pendingChanges.deleted.clear();
+      this.readCache.clear();
       return;
     }
     if (this.pendingChanges.full) return;
@@ -533,12 +597,12 @@ export class ScrippetManager {
     this.instanceCache.delete(descriptor.id);
     this.unregisterCommand(descriptor.id);
     this.errorMap.delete(normalized);
-    this.skipped.delete(normalized);
+    this.duplicates.delete(normalized);
   }
 
   private async refreshDescriptor(path: string): Promise<void> {
     const normalized = normalizePath(path);
-    if (!normalized.toLowerCase().endsWith(".js")) {
+    if (!this.isAllowedExtension(normalized)) {
       this.removeDescriptor(normalized);
       return;
     }
@@ -551,7 +615,7 @@ export class ScrippetManager {
 
     const existing = this.descriptorsByPath.get(normalized);
     try {
-      const descriptor = await this.createDescriptor(normalized, kind);
+      const descriptor = await this.withReadCache(() => this.createDescriptor(normalized, kind));
       if (existing && existing.id !== descriptor.id) {
         this.descriptorsById.delete(existing.id);
         this.instanceCache.delete(existing.id);
@@ -562,7 +626,8 @@ export class ScrippetManager {
       if (duplicate && duplicate.path !== normalized) {
         this.descriptorsByPath.delete(normalized);
         this.errorMap.set(normalized, `Duplicate scrippet id "${descriptor.id}"`);
-        this.skipped.add(normalized);
+        const suggestion = this.generateIdSuggestion(descriptor.id);
+        this.duplicates.set(normalized, { path: normalized, id: descriptor.id, suggestion });
         return;
       }
 
@@ -570,7 +635,7 @@ export class ScrippetManager {
       this.descriptorsById.set(descriptor.id, descriptor);
       this.instanceCache.delete(descriptor.id);
       this.errorMap.delete(normalized);
-      this.skipped.delete(normalized);
+      this.duplicates.delete(normalized);
 
       if (descriptor.kind === "command") {
         if (descriptor.enabled) this.registerCommand(descriptor);
@@ -584,7 +649,14 @@ export class ScrippetManager {
         this.unregisterCommand(existing.id);
       }
       this.errorMap.set(normalized, (error as Error).message ?? String(error));
+      this.duplicates.delete(normalized);
     }
+  }
+
+  private invalidateCachedPath(path: string): void {
+    if (!path) return;
+    const normalized = normalizePath(path);
+    this.readCache.delete(normalized);
   }
 
   private resolveKind(path: string): ScrippetKind | null {
@@ -594,14 +666,14 @@ export class ScrippetManager {
   }
 
   private async createDescriptor(path: string, kind: ScrippetKind): Promise<ScrippetDescriptor> {
-    const adapter = this.plugin.app.vault.adapter;
-    const src = await adapter.read(path);
+    const src = await this.readFile(path);
     const { metadata } = parseScrippetMetadata(src);
     const id = toIdentifier(path, metadata);
     if (!id) throw new Error("Unable to derive scrippet id");
     const name = toDisplayName(path, metadata);
     const description = metadata.description ?? metadata.desc;
     const preference = this.ensurePreference(id, path);
+    const modified = await this.getModifiedTime(path);
     return {
       id,
       name,
@@ -611,7 +683,58 @@ export class ScrippetManager {
       metadata,
       enabled: preference.enabled,
       headerSnippet: buildHeaderSnippet(src),
+      modified,
     };
+  }
+
+  private async getModifiedTime(path: string): Promise<number> {
+    const normalized = normalizePath(path);
+    const file = this.plugin.app.vault.getAbstractFileByPath(normalized);
+    if (file instanceof TFile) return file.stat.mtime;
+    try {
+      const stat = await this.plugin.app.vault.adapter.stat(normalized);
+      return stat?.mtime ?? Date.now();
+    } catch {
+      return Date.now();
+    }
+  }
+
+  private async readFile(path: string, useCache = true): Promise<string> {
+    const normalized = normalizePath(path);
+    if (useCache && this.cacheActive) {
+      const cached = this.readCache.get(normalized);
+      if (cached != null) return cached;
+    }
+    const data = await this.plugin.app.vault.adapter.read(normalized);
+    if (useCache && this.cacheActive) {
+      this.readCache.set(normalized, data);
+    }
+    return data;
+  }
+
+  private async withReadCache<T>(task: () => Promise<T>): Promise<T> {
+    this.cacheActive = true;
+    this.readCache.clear();
+    try {
+      return await task();
+    } finally {
+      this.cacheActive = false;
+      this.readCache.clear();
+    }
+  }
+
+  private generateIdSuggestion(baseId: string, processedIds?: Set<string>): string {
+    const taken = new Set<string>();
+    this.descriptorsById.forEach((_descriptor, id) => taken.add(id));
+    if (processedIds) {
+      processedIds.forEach((id) => taken.add(id));
+    }
+    let attempt = baseId;
+    let counter = 2;
+    while (taken.has(attempt)) {
+      attempt = `${baseId}-${counter++}`;
+    }
+    return attempt;
   }
 
   private updateLastScan(): void {
@@ -621,8 +744,8 @@ export class ScrippetManager {
     const errors = Array.from(this.errorMap.entries())
       .map(([path, message]) => ({ path, message }))
       .sort((a, b) => a.path.localeCompare(b.path));
-    const skipped = Array.from(this.skipped.values()).sort();
-    this.lastScan = { commands, startup, errors, skipped };
+    const duplicates = Array.from(this.duplicates.values()).sort((a, b) => a.path.localeCompare(b.path));
+    this.lastScan = { commands, startup, errors, duplicates };
   }
 
   private async flushSettings(): Promise<void> {

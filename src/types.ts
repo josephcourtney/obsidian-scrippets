@@ -18,6 +18,7 @@ export interface ScrippetDescriptor {
   metadata: ScrippetMetadata;
   enabled: boolean;
   headerSnippet: string;
+  modified: number;
 }
 
 export interface ScriptPreference {
@@ -31,6 +32,9 @@ export interface ScrippetPluginSettings {
   confirmBeforeFirstRun: boolean;
   scriptStates: Record<string, ScriptPreference>;
   startupAcknowledged: boolean;
+  allowedExtensions: string[];
+  listSort: ScrippetListSort;
+  trustedFolders: string[];
 }
 
 export const DEFAULT_SETTINGS: ScrippetPluginSettings = {
@@ -39,10 +43,13 @@ export const DEFAULT_SETTINGS: ScrippetPluginSettings = {
   confirmBeforeFirstRun: true,
   scriptStates: {},
   startupAcknowledged: false,
+  allowedExtensions: [".js", ".mjs", ".cjs"],
+  listSort: { field: "name", direction: "asc" },
+  trustedFolders: [],
 };
 
 export interface ScrippetModule {
-  invoke: (plugin: Plugin) => unknown | Promise<unknown>;
+  invoke: (plugin: Plugin) => void | Promise<unknown>;
 }
 
 export interface LoadedScrippet extends ScrippetDescriptor {
@@ -54,9 +61,22 @@ export interface ScrippetLoadError {
   message: string;
 }
 
+export interface ScrippetDuplicate {
+  path: string;
+  id: string;
+  suggestion: string;
+}
+
 export interface ScrippetScanResult {
   commands: ScrippetDescriptor[];
   startup: ScrippetDescriptor[];
   errors: ScrippetLoadError[];
-  skipped: string[];
+  duplicates: ScrippetDuplicate[];
+}
+
+export type ScrippetSortField = "name" | "modified" | "enabled";
+
+export interface ScrippetListSort {
+  field: ScrippetSortField;
+  direction: "asc" | "desc";
 }
