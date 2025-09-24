@@ -40,8 +40,8 @@ export function applyModalAccessibility(
     if (event.key !== "Tab") return;
     const elements = getFocusable();
     if (elements.length === 0) return;
-    const first = elements[0]!;
-    const last = elements[elements.length - 1]!;
+    const first = elements[0];
+    const last = elements[elements.length - 1];
     if (event.shiftKey) {
       if (document.activeElement === first) {
         event.preventDefault();
