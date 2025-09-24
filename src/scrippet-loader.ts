@@ -1,7 +1,10 @@
 import { Notice, type Plugin } from "obsidian";
 import type { ScrippetModule } from "./types";
 
+type ModuleFactory = (plugin: Plugin, app: Plugin["app"], notice: typeof Notice) => unknown;
+
 export function loadScrippet(plugin: Plugin, source: string): ScrippetModule {
+  // eslint-disable-next-line @typescript-eslint/no-implied-eval
   const factory = new Function(
     "plugin",
     "app",
@@ -29,12 +32,18 @@ return (typeof module !== 'undefined' && module.exports)
   || (typeof window.Scrippet === 'function' && window.Scrippet)
   ;
     `,
-  );
+  ) as ModuleFactory;
 
   const mod = factory(plugin, plugin.app, Notice);
-  const instance = typeof mod === "function" ? new mod(plugin) : mod;
-  if (!instance || typeof instance.invoke !== "function") {
+  const instance = typeof mod === "function" ? new (mod as new (plugin: Plugin) => unknown)(plugin) : mod;
+  if (!isScrippetModule(instance)) {
     throw new Error("Scrippet must expose invoke(plugin)");
   }
-  return instance as ScrippetModule;
+  return instance;
+}
+
+function isScrippetModule(candidate: unknown): candidate is ScrippetModule {
+  if (!candidate || typeof candidate !== "object") return false;
+  const invoke = (candidate as Record<string, unknown>).invoke;
+  return typeof invoke === "function";
 }
