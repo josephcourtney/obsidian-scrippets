@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file. Dates use the ISO 8601 format (YYYY-MM-DD).
 
-## [Unreleased]
+## [1.3.0] - 2025-09-24
 ### Added
 - Document metadata-first scanning with header previews and accessible first-run modals introduced after 1.1.1.
 - Add realtime search, multi-criteria sorting, duplicate-id remediation, and hotkey shortcuts to the settings list.
@@ -13,7 +13,7 @@ All notable changes to this project will be documented in this file. Dates use t
 - Batch vault events with adaptive debounce and reuse cached file reads per scan cycle while limiting source maps to development builds.
 - Add `npm run check`, Prettier formatting, and upgraded ESLint v9 TypeScript rules (including `no-floating-promises`).
 
-## [1.1.1] - 2025-03-05
+## [1.1.1] - 2025-09-23
 ### Added
 - Add metadata-first scanning with header previews, first-run context, and accessible modals.
 - Add settings controls to open scrippet files and copy their vault-relative paths.
