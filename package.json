@@ -9,7 +9,7 @@
     "lint": "eslint ./src",
     "check": "tsc -noEmit -skipLibCheck && npm run lint",
     "format": "prettier --write \"src/**/*.{ts,tsx}\" styles.css \"*.md\"",
-    "version": "node version-bump.mjs && git add manifest.json versions.json",
+    "version": "node scripts/version-bump.mjs && git add manifest.json versions.json",
     "prepublish:assets": "node -e \"const fs=require('fs');if(!fs.existsSync('main.js')){process.exitCode=1;throw new Error('Run npm run build first');}\"",
     "release": "node scripts/release.mjs"
   },
