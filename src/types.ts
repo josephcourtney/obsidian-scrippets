@@ -24,6 +24,21 @@ export interface ScrippetDescriptor {
 export interface ScriptPreference {
   enabled: boolean;
   hasRun: boolean;
+  startupApproved?: boolean;
+}
+
+export type ScrippetExecutionTrigger = "command" | "manual" | "startup";
+export type ScrippetExecutionStatus = "success" | "failed";
+
+export interface ScrippetExecutionRecord {
+  id: string;
+  name: string;
+  path: string;
+  trigger: ScrippetExecutionTrigger;
+  status: ScrippetExecutionStatus;
+  startedAt: number;
+  durationMs: number;
+  error?: string;
 }
 
 export interface ScrippetPluginSettings {
@@ -80,4 +95,3 @@ export interface ScrippetListSort {
   field: ScrippetSortField;
   direction: "asc" | "desc";
 }
-

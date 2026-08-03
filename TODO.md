@@ -7,8 +7,6 @@
   - Human-readable units stored per file in metadata, overridable in settings.
 - [ ] Add "Dry-run startup (no writes)" toggle
   - Inject no-op adapter vs. throw errors on write.
-- [ ] Persist a log panel of recent scrippet runs and errors
-  - Truncate to last N entries.
 - [ ] Expose utility module for shared helpers to scrippets
   - Bundle helpers inside plugin and expose a stable, minimal API.
 - [ ] Document utility module in README

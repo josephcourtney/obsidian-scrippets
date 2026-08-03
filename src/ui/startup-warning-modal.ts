@@ -23,7 +23,7 @@ export class StartupWarningModal extends Modal {
       text: "Startup scrippets run automatically every time Obsidian loads. Only enable if you trust every script in the startup folder.",
     });
     this.contentEl.createEl("p", {
-      text: "They can modify or delete any file in your vault and run without additional confirmation.",
+      text: "Each untrusted startup scrippet also requires one-time approval before it can run automatically.",
       cls: "scrippet-confirm-warning",
     });
     const buttons = new Setting(this.contentEl);

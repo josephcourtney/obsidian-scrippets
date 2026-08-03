@@ -132,3 +132,63 @@
   color: inherit;
 }
 
+.scrippet-description {
+  margin-bottom: 2px;
+}
+
+.scrippet-metadata {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 12px;
+  row-gap: 2px;
+  font-size: var(--font-small);
+  color: var(--text-muted);
+}
+
+.scrippet-metadata-field {
+  white-space: nowrap;
+}
+
+.scrippet-metadata-label {
+  font-weight: var(--font-medium);
+}
+
+.scrippet-metadata-label {
+  font-weight: var(--font-medium);
+}
+
+.scrippet-execution-history {
+  display: grid;
+  gap: 6px;
+  margin: 6px 0 16px;
+}
+
+.scrippet-execution-record {
+  padding: 8px 10px;
+  background: var(--background-secondary);
+  border-radius: 6px;
+}
+
+.scrippet-execution-summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.scrippet-execution-name {
+  font-weight: var(--font-medium);
+}
+
+.scrippet-execution-status,
+.scrippet-execution-time {
+  color: var(--text-muted);
+  font-size: var(--font-small);
+}
+
+.scrippet-execution-error {
+  margin-top: 4px;
+  color: var(--text-error);
+  font-size: var(--font-small);
+  overflow-wrap: anywhere;
+}

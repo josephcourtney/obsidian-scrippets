@@ -2,22 +2,38 @@ import { App, Modal, Setting, normalizePath } from "obsidian";
 import type { ScrippetDescriptor } from "../types";
 import { applyModalAccessibility } from "./accessibility";
 
-export function confirmFirstRun(app: App, descriptor: ScrippetDescriptor): Promise<boolean> {
+export interface ConfirmRunOptions {
+  startupApproval?: boolean;
+}
+
+export function confirmFirstRun(
+  app: App,
+  descriptor: ScrippetDescriptor,
+  options: ConfirmRunOptions = {},
+): Promise<boolean> {
   return new Promise((resolve) => {
-    const modal = new ConfirmRunModal(app, descriptor, resolve);
+    const modal = new ConfirmRunModal(app, descriptor, options, resolve);
     modal.open();
   });
 }
 
 class ConfirmRunModal extends Modal {
   private readonly descriptor: ScrippetDescriptor;
+
+  private readonly options: ConfirmRunOptions;
   private readonly resolver: (value: boolean) => void;
   private resolved = false;
   private cleanupAccessibility: (() => void) | null = null;
 
-  constructor(app: App, descriptor: ScrippetDescriptor, resolver: (value: boolean) => void) {
+  constructor(
+    app: App,
+    descriptor: ScrippetDescriptor,
+    options: ConfirmRunOptions,
+    resolver: (value: boolean) => void,
+  ) {
     super(app);
     this.descriptor = descriptor;
+    this.options = options;
     this.resolver = resolver;
   }
 
@@ -25,7 +41,9 @@ class ConfirmRunModal extends Modal {
     this.modalEl.addClass("scrippet-confirm-modal");
     this.titleEl.setText("Run scrippet?");
     this.contentEl.createEl("p", {
-      text: `This is the first time running "${this.descriptor.name}". Only continue if you trust this code.`,
+      text: this.options.startupApproval
+        ? `Approve "${this.descriptor.name}" to run automatically when startup scripts are enabled.`
+        : `This is the first time running "${this.descriptor.name}". Only continue if you trust this code.`,
     });
     this.contentEl.createEl("p", {
       text: "Scrippets can read and modify anything in your vault and run with the same permissions as Obsidian.",
@@ -61,7 +79,7 @@ class ConfirmRunModal extends Modal {
     });
     buttons.addButton((btn) =>
       btn
-        .setButtonText("Run")
+        .setButtonText(this.options.startupApproval ? "Approve" : "Run")
         .setCta()
         .onClick(() => {
           this.resolve(true);

@@ -1,4 +1,13 @@
-import { App, Notice, PluginSettingTab, Setting, TFile, normalizePath, setIcon } from "obsidian";
+import {
+  App,
+  Notice,
+  PluginSettingTab,
+  Setting,
+  TFile,
+  normalizePath,
+  setIcon,
+  FileSystemAdapter,
+} from "obsidian";
 import type ScrippetPlugin from "../main";
 import type { ScrippetDescriptor, ScrippetDuplicate, ScrippetSortField } from "../types";
 import { AddScrippetModal } from "./add-scrippet-modal";
@@ -38,6 +47,7 @@ export class ScrippetSettingTab extends PluginSettingTab {
     this.renderConfirmToggle(containerEl);
     this.renderManageControls(containerEl);
     this.renderMessages(containerEl);
+    this.renderExecutionHistory(containerEl);
     this.renderListControls(containerEl);
 
     this.listContainer = containerEl.createDiv({ cls: "scrippet-list-sections" });
@@ -45,15 +55,7 @@ export class ScrippetSettingTab extends PluginSettingTab {
   }
 
   private renderHeader(container: HTMLElement): void {
-    const heading = new Setting(container).setName("Scrippets").setHeading();
-    heading.addExtraButton((button) =>
-      button
-        .setIcon("copy")
-        .setTooltip("Copy scrippets folder path")
-        .onClick(() => {
-          void this.copyFolderPath();
-        }),
-    );
+    new Setting(container).setName("Scrippets").setHeading();
   }
 
   private renderSecurityNotice(container: HTMLElement): void {
@@ -81,6 +83,15 @@ export class ScrippetSettingTab extends PluginSettingTab {
         this.display();
       }),
     );
+
+    setting.addButton((button) =>
+      button
+        .setIcon("copy")
+        .setTooltip("Copy scrippets folder absolute path")
+        .onClick(() => {
+          void this.copyFolderPath();
+        }),
+    );
   }
 
   private renderTrustControls(container: HTMLElement): void {
@@ -89,7 +100,7 @@ export class ScrippetSettingTab extends PluginSettingTab {
 
     new Setting(container)
       .setName("Always trust this folder")
-      .setDesc("Skip first-run confirmations for scripts in this folder.")
+      .setDesc("Skip first-run and startup approval prompts for scripts in this folder.")
       .addToggle((toggle) =>
         toggle.setValue(trusted).onChange(async (value) => {
           await this.setFolderTrust(currentFolder, value);
@@ -110,7 +121,7 @@ export class ScrippetSettingTab extends PluginSettingTab {
     for (const folder of others) {
       const setting = new Setting(wrapper)
         .setName(folder)
-        .setDesc("Scripts in this folder skip first-run confirmation.");
+        .setDesc("Scripts in this folder skip first-run and startup approval prompts.");
       setting.addButton((btn) =>
         btn
           .setButtonText("Revoke trust")
@@ -167,7 +178,9 @@ export class ScrippetSettingTab extends PluginSettingTab {
   private renderConfirmToggle(container: HTMLElement): void {
     new Setting(container)
       .setName("Confirm before first run")
-      .setDesc("Ask for confirmation the first time each scrippet executes.")
+      .setDesc(
+        "Ask before the first manual run. Untrusted startup scrippets always require separate approval.",
+      )
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.confirmBeforeFirstRun).onChange(async (value) => {
           this.plugin.settings.confirmBeforeFirstRun = value;
@@ -210,7 +223,9 @@ export class ScrippetSettingTab extends PluginSettingTab {
     }
 
     if (duplicates.length > 0) {
-      const duplicateBox = container.createEl("div", { cls: "scrippet-warning scrippet-duplicates" });
+      const duplicateBox = container.createEl("div", {
+        cls: "scrippet-warning scrippet-duplicates",
+      });
       duplicateBox.createEl("strong", { text: "Duplicate IDs" });
       for (const duplicate of duplicates) {
         this.renderDuplicate(duplicateBox, duplicate);
@@ -223,11 +238,9 @@ export class ScrippetSettingTab extends PluginSettingTab {
       .setName(duplicate.path)
       .setDesc(`Conflicting id "${duplicate.id}". Suggested id: ${duplicate.suggestion}.`);
     setting.addButton((btn) =>
-      btn
-        .setButtonText(`Rename to ${duplicate.suggestion}`)
-        .onClick(async () => {
-          await this.handleDuplicateRename(duplicate);
-        }),
+      btn.setButtonText(`Rename to ${duplicate.suggestion}`).onClick(async () => {
+        await this.handleDuplicateRename(duplicate);
+      }),
     );
     setting.addExtraButton((btn) =>
       btn
@@ -237,6 +250,42 @@ export class ScrippetSettingTab extends PluginSettingTab {
           void this.openFile(duplicate.path);
         }),
     );
+  }
+
+  private renderExecutionHistory(container: HTMLElement): void {
+    const history = this.plugin.manager.recentExecutions;
+    const heading = new Setting(container)
+      .setName("Recent executions")
+      .setDesc("This-session history of scrippet runs, newest first.");
+
+    heading.addButton((button) =>
+      button
+        .setButtonText("Clear")
+        .setDisabled(history.length === 0)
+        .onClick(() => {
+          this.plugin.manager.clearExecutionHistory();
+        }),
+    );
+
+    if (history.length === 0) return;
+
+    const list = container.createDiv({ cls: "scrippet-execution-history" });
+    for (const record of history.slice(0, 10)) {
+      const row = list.createDiv({ cls: "scrippet-execution-record" });
+      const summary = row.createDiv({ cls: "scrippet-execution-summary" });
+      summary.createSpan({ text: record.name, cls: "scrippet-execution-name" });
+      summary.createSpan({
+        text: `${record.status} · ${record.trigger} · ${record.durationMs} ms`,
+        cls: "scrippet-execution-status",
+      });
+      row.createDiv({
+        text: new Date(record.startedAt).toLocaleString(),
+        cls: "scrippet-execution-time",
+      });
+      if (record.error) {
+        row.createDiv({ text: record.error, cls: "scrippet-execution-error" });
+      }
+    }
   }
 
   private renderListControls(container: HTMLElement): void {
@@ -254,7 +303,10 @@ export class ScrippetSettingTab extends PluginSettingTab {
     });
 
     const sortWrapper = controls.createDiv({ cls: "scrippet-sort" });
-    const sortLabel = sortWrapper.createEl("label", { text: "Sort by", cls: "scrippet-sort-label" });
+    const sortLabel = sortWrapper.createEl("label", {
+      text: "Sort by",
+      cls: "scrippet-sort-label",
+    });
     sortLabel.setAttr("for", "scrippet-sort-select");
 
     const select = sortWrapper.createEl("select", { attr: { id: "scrippet-sort-select" } });
@@ -316,10 +368,33 @@ export class ScrippetSettingTab extends PluginSettingTab {
     }
   }
 
-  private renderDescriptor(container: HTMLElement, script: ScrippetDescriptor, startup: boolean): void {
-    const setting = new Setting(container)
-      .setName(script.name)
-      .setDesc(this.buildDescription(script));
+  private renderDescriptor(
+    container: HTMLElement,
+    script: ScrippetDescriptor,
+    startup: boolean,
+  ): void {
+    const setting = new Setting(container).setName(script.name);
+
+    const descriptionEl = setting.descEl;
+
+    if (script.description) {
+      descriptionEl.createDiv({
+        cls: "scrippet-description",
+        text: script.description,
+      });
+    }
+
+    const metadata = descriptionEl.createDiv({
+      cls: "scrippet-metadata",
+    });
+
+    this.addMetadataField(metadata, "ID", script.id);
+    this.addMetadataField(metadata, "File", normalizePath(script.path));
+    this.addMetadataField(metadata, "Modified", this.formatModified(script.modified));
+
+    if (this.plugin.manager.isRunning(script.id)) {
+      this.addMetadataField(metadata, "Status", "Running");
+    }
 
     setting.addToggle((toggle) =>
       toggle.setValue(script.enabled).onChange(async (value) => {
@@ -332,7 +407,11 @@ export class ScrippetSettingTab extends PluginSettingTab {
         .setIcon("copy")
         .setTooltip("Copy path")
         .onClick(() => {
-          void this.copyToClipboard(normalizePath(script.path), "Scrippet path copied.", "Failed to copy path.");
+          void this.copyToClipboard(
+            normalizePath(script.path),
+            "Scrippet path copied.",
+            "Failed to copy path.",
+          );
         }),
     );
 
@@ -358,14 +437,20 @@ export class ScrippetSettingTab extends PluginSettingTab {
       setting.addExtraButton((btn) =>
         btn
           .setIcon("play")
-          .setTooltip("Run now")
-          .setDisabled(!script.enabled)
+          .setTooltip(this.plugin.manager.isRunning(script.id) ? "Already running" : "Run now")
+          .setDisabled(!script.enabled || this.plugin.manager.isRunning(script.id))
           .onClick(async () => {
-            if (!script.enabled) return;
-            await this.plugin.manager.executeById(script.id);
+            if (!script.enabled || this.plugin.manager.isRunning(script.id)) return;
+            await this.plugin.manager.executeById(script.id, "manual");
           }),
       );
     }
+  }
+
+  private addMetadataField(container: HTMLElement, label: string, value: string): void {
+    const field = container.createSpan({ cls: "scrippet-metadata-field" });
+    field.createSpan({ cls: "scrippet-metadata-label", text: `${label}: ` });
+    field.createSpan({ text: value });
   }
 
   private prepareDescriptors(descriptors: ScrippetDescriptor[]): ScrippetDescriptor[] {
@@ -404,15 +489,6 @@ export class ScrippetSettingTab extends PluginSettingTab {
     );
   }
 
-  private buildDescription(script: ScrippetDescriptor): string {
-    const parts = [] as string[];
-    if (script.description) parts.push(script.description);
-    parts.push(`ID: ${script.id}`);
-    parts.push(`File: ${normalizePath(script.path)}`);
-    parts.push(`Modified: ${this.formatModified(script.modified)}`);
-    return parts.join(" \u2014 ");
-  }
-
   private formatModified(modified: number): string {
     const date = new Date(modified);
     if (Number.isNaN(date.getTime())) return "unknown";
@@ -420,8 +496,19 @@ export class ScrippetSettingTab extends PluginSettingTab {
   }
 
   private async copyFolderPath(): Promise<void> {
-    const folder = normalizePath(this.plugin.settings.folder);
-    await this.copyToClipboard(folder, "Scrippets folder path copied.", "Failed to copy folder path.");
+    const adapter = this.app.vault.adapter;
+    let vaultPath;
+    if (adapter instanceof FileSystemAdapter) {
+      vaultPath = adapter.getBasePath();
+    } else {
+      new Notice("Failed to retrieve absolute base path for vault.");
+    }
+    const absolutePath = `${vaultPath}/${this.plugin.settings.folder}`;
+    await this.copyToClipboard(
+      absolutePath,
+      "Scrippets folder path copied.",
+      "Failed to copy folder path.",
+    );
   }
 
   private async copyToClipboard(text: string, success: string, failure: string): Promise<void> {
@@ -446,21 +533,27 @@ export class ScrippetSettingTab extends PluginSettingTab {
 
   private openHotkeySettings(script: ScrippetDescriptor): void {
     const commandId = this.plugin.manager.getCommandId(script.id);
-    const settingManager = (this.app as App & {
-      setting: {
-        openTabById: (id: string) => void;
-        activeTab: unknown;
-        containerEl: HTMLElement;
-      };
-    }).setting;
+    const settingManager = (
+      this.app as App & {
+        setting: {
+          openTabById: (id: string) => void;
+          activeTab: unknown;
+          containerEl: HTMLElement;
+        };
+      }
+    ).setting;
     settingManager.openTabById("hotkeys");
     window.setTimeout(() => {
-      const active = settingManager.activeTab as { setQuery?: (query: string) => void; containerEl: HTMLElement } | null;
+      const active = settingManager.activeTab as {
+        setQuery?: (query: string) => void;
+        containerEl: HTMLElement;
+      } | null;
       if (active?.setQuery) {
         active.setQuery(commandId);
         return;
       }
-      const input = settingManager.containerEl.querySelector<HTMLInputElement>("input[type=\"search\"]");
+      const input =
+        settingManager.containerEl.querySelector<HTMLInputElement>('input[type="search"]');
       if (input) {
         input.focus();
         input.value = commandId;
@@ -471,7 +564,11 @@ export class ScrippetSettingTab extends PluginSettingTab {
 
   private async handleDuplicateRename(duplicate: ScrippetDuplicate): Promise<void> {
     try {
-      await this.plugin.manager.renameScrippetId(duplicate.path, duplicate.id, duplicate.suggestion);
+      await this.plugin.manager.renameScrippetId(
+        duplicate.path,
+        duplicate.id,
+        duplicate.suggestion,
+      );
       new Notice(`Updated id to ${duplicate.suggestion}.`);
     } catch (error) {
       console.error("Scrippets: failed to rename duplicate id", error);
@@ -496,7 +593,9 @@ export class ScrippetSettingTab extends PluginSettingTab {
 
   private hasExtension(ext: string): boolean {
     const normalized = ext.toLowerCase();
-    return this.plugin.settings.allowedExtensions.some((entry) => entry.toLowerCase() === normalized);
+    return this.plugin.settings.allowedExtensions.some(
+      (entry) => entry.toLowerCase() === normalized,
+    );
   }
 
   private handleExtensionToggle(ext: string, input: HTMLInputElement): void {
@@ -526,11 +625,12 @@ export class ScrippetSettingTab extends PluginSettingTab {
 
   private async setFolderTrust(folder: string, trusted: boolean): Promise<void> {
     const normalized = normalizePath(folder);
-    const entries = new Set(this.plugin.settings.trustedFolders.map((entry) => normalizePath(entry)));
+    const entries = new Set(
+      this.plugin.settings.trustedFolders.map((entry) => normalizePath(entry)),
+    );
     if (trusted) entries.add(normalized);
     else entries.delete(normalized);
     this.plugin.settings.trustedFolders = Array.from(entries).sort();
     await this.plugin.saveSettings();
   }
 }
-

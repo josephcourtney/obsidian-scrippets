@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file. Dates use the ISO 8601 format (YYYY-MM-DD).
 
+## [1.5.0] - 2026-08-03
+### Added
+- Add bounded, session-local execution history with trigger, duration, status, and error details.
+- Show running state in settings and prevent overlapping invocation of the same scrippet.
+- Add regression tests for serialized task execution and recovery after failed queued work.
+
+### Changed
+- Serialize full reloads, folder changes, duplicate-id remediation, and file-event reconciliation so scans cannot overlap.
+- Label settings-triggered runs separately from command-palette and startup runs in execution history.
+- Reuse the normal execution path for startup scrippets after startup approval, keeping error and running-state behavior consistent.
+
+### Fixed
+- Prevent concurrent reload/reconciliation operations from racing while mutating descriptor and command state.
+
+## [1.4.1] - 2026-08-03
+### Fixed
+- Require a one-time per-scrippet approval before an untrusted startup scrippet can run automatically.
+- Keep startup approval separate from normal first-run history so a previously run command is not implicitly approved for unattended startup.
+
+### Changed
+- Clarify startup, trusted-folder, and first-run confirmation messaging around the new approval behavior.
+- Correct contributor documentation to reflect the automated regression test suite included in `npm run check`.
+
+
 ## [1.4.0] - 2026-08-03
 ### Added
 - Add regression tests for supported runtime export shapes and include tests in `npm run check`.

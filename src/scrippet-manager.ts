@@ -1,12 +1,4 @@
-import {
-  App,
-  DataAdapter,
-  Notice,
-  Plugin,
-  TAbstractFile,
-  TFile,
-  normalizePath,
-} from "obsidian";
+import { App, DataAdapter, Notice, Plugin, TAbstractFile, TFile, normalizePath } from "obsidian";
 import {
   buildHeaderSnippet,
   parseScrippetMetadata,
@@ -14,7 +6,9 @@ import {
   toIdentifier,
   updateScrippetId,
 } from "./metadata";
+import { shouldConfirmFirstRun, shouldConfirmStartupApproval } from "./execution-policy";
 import { loadScrippet } from "./scrippet-loader";
+import { SerialTaskQueue } from "./serial-task-queue";
 import { confirmFirstRun } from "./ui/confirm-run-modal";
 import type {
   LoadedScrippet,
@@ -23,6 +17,8 @@ import type {
   ScrippetLoadError,
   ScrippetPluginSettings,
   ScrippetScanResult,
+  ScrippetExecutionRecord,
+  ScrippetExecutionTrigger,
   ScrippetKind,
   ScriptPreference,
 } from "./types";
@@ -30,6 +26,7 @@ import { DEFAULT_SETTINGS } from "./types";
 
 const STARTUP_FOLDER = "startup";
 const COMMAND_PREFIX = "scrippet";
+const EXECUTION_HISTORY_LIMIT = 50;
 
 interface PendingChanges {
   changed: Set<string>;
@@ -54,6 +51,7 @@ export interface ScrippetHost extends Plugin {
 
 export class ScrippetManager {
   private readonly plugin: ScrippetHost;
+  private readonly reloadQueue = new SerialTaskQueue();
   private commands = new Map<string, string>();
   private instanceCache = new Map<string, LoadedScrippet>();
   private descriptorsByPath = new Map<string, ScrippetDescriptor>();
@@ -72,6 +70,8 @@ export class ScrippetManager {
   private readCache = new Map<string, string>();
   private cacheActive = false;
   private disposed = false;
+  private runningIds = new Set<string>();
+  private executionHistory: ScrippetExecutionRecord[] = [];
   private lastScan: ScrippetScanResult = {
     commands: [],
     startup: [],
@@ -87,6 +87,20 @@ export class ScrippetManager {
     return this.lastScan;
   }
 
+  get recentExecutions(): readonly ScrippetExecutionRecord[] {
+    return this.executionHistory;
+  }
+
+  isRunning(id: string): boolean {
+    return this.runningIds.has(id);
+  }
+
+  clearExecutionHistory(): void {
+    if (this.executionHistory.length === 0) return;
+    this.executionHistory = [];
+    this.notify();
+  }
+
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
@@ -97,10 +111,12 @@ export class ScrippetManager {
   }
 
   async initialize(): Promise<void> {
-    if (this.disposed) return;
-    await this.ensureFolders();
-    await this.performFullReload({ runStartup: false });
-    this.registerWatchers();
+    await this.reloadQueue.run(async () => {
+      if (this.disposed) return;
+      await this.ensureFolders();
+      await this.performFullReload({ runStartup: false });
+      this.registerWatchers();
+    });
   }
 
   destroy(): void {
@@ -114,44 +130,58 @@ export class ScrippetManager {
   }
 
   async setFolder(newFolder: string): Promise<void> {
-    const fallbackFolder = normalizePath(`${this.plugin.app.vault.configDir}/scrippets`);
-    const normalized = normalizePath(newFolder.trim() || fallbackFolder);
-    if (normalized === this.plugin.settings.folder) return;
-    this.plugin.settings.folder = normalized;
-    await this.plugin.saveSettings();
-    await this.ensureFolders();
-    await this.performFullReload({ runStartup: false });
+    await this.reloadQueue.run(async () => {
+      if (this.disposed) return;
+      const fallbackFolder = normalizePath(`${this.plugin.app.vault.configDir}/scrippets`);
+      const normalized = normalizePath(newFolder.trim() || fallbackFolder);
+      if (normalized === this.plugin.settings.folder) return;
+      this.plugin.settings.folder = normalized;
+      await this.plugin.saveSettings();
+      await this.ensureFolders();
+      await this.performFullReload({ runStartup: false });
+    });
   }
 
   async reload(options: { runStartup?: boolean } = {}): Promise<void> {
-    await this.performFullReload({ runStartup: options.runStartup ?? false });
+    await this.reloadQueue.run(async () => {
+      if (this.disposed) return;
+      await this.performFullReload({ runStartup: options.runStartup ?? false });
+    });
   }
 
   async runStartupScripts(): Promise<void> {
-    await this.executeStartup(this.lastScan.startup);
+    const descriptors = await this.reloadQueue.run(() => {
+      if (this.disposed) return [];
+      return [...this.lastScan.startup];
+    });
+    await this.executeStartup(descriptors);
   }
 
-  async executeById(id: string): Promise<void> {
+  async executeById(id: string, trigger: ScrippetExecutionTrigger = "command"): Promise<void> {
     const descriptor = this.descriptorsById.get(id);
     if (!descriptor) return;
-    await this.executeDescriptor(descriptor);
+    await this.executeDescriptor(descriptor, trigger);
   }
 
   async toggleDescriptor(descriptor: ScrippetDescriptor, enabled: boolean): Promise<void> {
-    const prefs = this.ensurePreference(descriptor.id, descriptor.path);
-    prefs.enabled = enabled;
-    this.settingsDirty = true;
-    const record = this.descriptorsById.get(descriptor.id);
-    if (record) record.enabled = enabled;
+    await this.reloadQueue.run(async () => {
+      if (this.disposed) return;
 
-    if (descriptor.kind === "command") {
-      if (enabled) this.registerCommand(record ?? descriptor);
-      else this.unregisterCommand(descriptor.id);
-    }
+      const prefs = this.ensurePreference(descriptor.id, descriptor.path);
+      prefs.enabled = enabled;
+      this.settingsDirty = true;
+      const record = this.descriptorsById.get(descriptor.id);
+      if (record) record.enabled = enabled;
 
-    this.updateLastScan();
-    this.notify();
-    await this.flushSettings();
+      if (descriptor.kind === "command") {
+        if (enabled) this.registerCommand(record ?? descriptor);
+        else this.unregisterCommand(descriptor.id);
+      }
+
+      this.updateLastScan();
+      this.notify();
+      await this.flushSettings();
+    });
   }
 
   getCommandId(id: string): string {
@@ -159,14 +189,17 @@ export class ScrippetManager {
   }
 
   async renameScrippetId(path: string, _previousId: string, newId: string): Promise<void> {
-    const normalized = normalizePath(path);
-    const adapter = this.plugin.app.vault.adapter;
-    const source = await this.readFile(normalized, false);
-    const updated = updateScrippetId(source, newId);
-    if (updated === source) return;
-    await adapter.write(normalized, updated);
-    this.invalidateCachedPath(normalized);
-    await this.performFullReload({ runStartup: false });
+    await this.reloadQueue.run(async () => {
+      if (this.disposed) return;
+      const normalized = normalizePath(path);
+      const adapter = this.plugin.app.vault.adapter;
+      const source = await this.readFile(normalized, false);
+      const updated = updateScrippetId(source, newId);
+      if (updated === source) return;
+      await adapter.write(normalized, updated);
+      this.invalidateCachedPath(normalized);
+      await this.performFullReload({ runStartup: false });
+    });
   }
 
   private get baseFolder(): string {
@@ -220,7 +253,11 @@ export class ScrippetManager {
     this.descriptorsById.set(descriptor.id, descriptor);
   }
 
-  private async executeDescriptor(descriptor: ScrippetDescriptor): Promise<void> {
+  private async executeDescriptor(
+    descriptor: ScrippetDescriptor,
+    trigger: ScrippetExecutionTrigger,
+    confirmManualRun = true,
+  ): Promise<void> {
     const prefs = this.ensurePreference(descriptor.id, descriptor.path);
 
     if (!prefs.enabled) {
@@ -228,32 +265,63 @@ export class ScrippetManager {
       return;
     }
 
-    if (this.shouldConfirmFirstRun(descriptor) && !prefs.hasRun) {
+    if (this.runningIds.has(descriptor.id)) {
+      new Notice(`Scrippet "${descriptor.name}" is already running.`);
+      return;
+    }
+
+    if (
+      confirmManualRun &&
+      shouldConfirmFirstRun(this.plugin.settings, prefs, this.isTrusted(descriptor.path))
+    ) {
       const confirmed = await confirmFirstRun(this.plugin.app, descriptor);
       if (!confirmed) return;
     }
 
-    let loaded: LoadedScrippet;
-    try {
-      loaded = await this.loadDescriptorInstance(descriptor);
-    } catch (error) {
-      this.recordLoadError(descriptor.path, error);
-      new Notice(
-        `Scrippet "${descriptor.name}" failed to load: ${(error as Error).message ?? String(error)}`,
-      );
-      return;
-    }
+    const startedAt = Date.now();
+    this.runningIds.add(descriptor.id);
+    this.notify();
+
+    let status: ScrippetExecutionRecord["status"] = "success";
+    let errorMessage: string | undefined;
+    let loaded = false;
 
     try {
-      await loaded.instance.invoke(this.plugin);
+      const instance = await this.loadDescriptorInstance(descriptor);
+      loaded = true;
+      await instance.instance.invoke(this.plugin);
       if (!prefs.hasRun) {
         prefs.hasRun = true;
         this.settingsDirty = true;
         await this.flushSettings();
       }
     } catch (error) {
-      console.error(`Scrippets: error invoking "${descriptor.name}"`, error);
-      new Notice(`Scrippet "${descriptor.name}" failed: ${(error as Error).message ?? error}`);
+      status = "failed";
+      errorMessage = toErrorMessage(error);
+      if (!loaded) {
+        this.recordLoadError(descriptor.path, error);
+      }
+      console.error(
+        `Scrippets: ${loaded ? "error invoking" : "failed to load"} "${descriptor.name}"`,
+        error,
+      );
+      const prefix = trigger === "startup" ? "Startup scrippet" : "Scrippet";
+      new Notice(
+        `${prefix} "${descriptor.name}" ${loaded ? "failed" : "failed to load"}: ${errorMessage}`,
+      );
+    } finally {
+      this.runningIds.delete(descriptor.id);
+      this.recordExecution({
+        id: descriptor.id,
+        name: descriptor.name,
+        path: descriptor.path,
+        trigger,
+        status,
+        startedAt,
+        durationMs: Math.max(0, Date.now() - startedAt),
+        ...(errorMessage ? { error: errorMessage } : {}),
+      });
+      this.notify();
     }
   }
 
@@ -279,11 +347,6 @@ export class ScrippetManager {
     scriptStates[idKey] = preference;
     this.settingsDirty = true;
     return preference;
-  }
-
-  private shouldConfirmFirstRun(descriptor: ScrippetDescriptor): boolean {
-    if (!this.plugin.settings.confirmBeforeFirstRun) return false;
-    return !this.isTrusted(descriptor.path);
   }
 
   private isTrusted(path: string): boolean {
@@ -327,35 +390,20 @@ export class ScrippetManager {
   }
 
   private async executeStartup(descriptors: ScrippetDescriptor[]): Promise<void> {
-    let updated = false;
     for (const descriptor of descriptors) {
-      const prefs = this.plugin.settings.scriptStates[descriptor.id];
-      if (prefs && !prefs.enabled) continue;
-      try {
-        const loaded = await this.loadDescriptorInstance(descriptor);
-        await loaded.instance.invoke(this.plugin);
-        if (!prefs) {
-          this.plugin.settings.scriptStates[descriptor.id] = {
-            enabled: true,
-            hasRun: true,
-          };
-          this.settingsDirty = true;
-          updated = true;
-        } else if (!prefs.hasRun) {
-          prefs.hasRun = true;
-          this.settingsDirty = true;
-          updated = true;
-        }
-      } catch (error) {
-        this.recordLoadError(descriptor.path, error);
-        console.error(`Scrippets: startup scrippet failed for ${descriptor.name}`, error);
-        new Notice(
-          `Startup scrippet "${descriptor.name}" failed: ${(error as Error).message ?? String(error)}`,
-        );
+      const prefs = this.ensurePreference(descriptor.id, descriptor.path);
+      if (!prefs.enabled) continue;
+
+      if (shouldConfirmStartupApproval(prefs, this.isTrusted(descriptor.path))) {
+        const confirmed = await confirmFirstRun(this.plugin.app, descriptor, {
+          startupApproval: true,
+        });
+        if (!confirmed) continue;
+        prefs.startupApproved = true;
+        this.settingsDirty = true;
+        await this.flushSettings();
       }
-    }
-    if (updated) {
-      await this.flushSettings();
+      await this.executeDescriptor(descriptor, "startup", false);
     }
   }
 
@@ -382,7 +430,10 @@ export class ScrippetManager {
   }
 
   private async scanScrippets(): Promise<ScrippetScanResult> {
-    const commandFiles = await this.listScriptFiles(this.baseFolder, (path) => !isWithin(path, this.startupFolder));
+    const commandFiles = await this.listScriptFiles(
+      this.baseFolder,
+      (path) => !isWithin(path, this.startupFolder),
+    );
     const startupFiles = await this.listScriptFiles(this.startupFolder);
 
     const errors: ScrippetLoadError[] = [];
@@ -470,7 +521,10 @@ export class ScrippetManager {
     }
   }
 
-  private async listScriptFiles(folder: string, filter?: (path: string) => boolean): Promise<string[]> {
+  private async listScriptFiles(
+    folder: string,
+    filter?: (path: string) => boolean,
+  ): Promise<string[]> {
     const adapter = this.plugin.app.vault.adapter;
     try {
       const listing = await adapter.list(folder);
@@ -492,15 +546,9 @@ export class ScrippetManager {
 
   private registerWatchers(): void {
     const vault = this.plugin.app.vault;
-    this.plugin.registerEvent(
-      vault.on("create", (file) => this.handleFileChange(file, "changed")),
-    );
-    this.plugin.registerEvent(
-      vault.on("modify", (file) => this.handleFileChange(file, "changed")),
-    );
-    this.plugin.registerEvent(
-      vault.on("delete", (file) => this.handleFileChange(file, "deleted")),
-    );
+    this.plugin.registerEvent(vault.on("create", (file) => this.handleFileChange(file, "changed")));
+    this.plugin.registerEvent(vault.on("modify", (file) => this.handleFileChange(file, "changed")));
+    this.plugin.registerEvent(vault.on("delete", (file) => this.handleFileChange(file, "deleted")));
     this.plugin.registerEvent(
       vault.on("rename", (file, oldPath) => {
         if (!(file instanceof TFile)) {
@@ -530,6 +578,13 @@ export class ScrippetManager {
     return isWithin(normalized, this.baseFolder) || isWithin(normalized, this.startupFolder);
   }
 
+  private recordExecution(record: ScrippetExecutionRecord): void {
+    this.executionHistory.unshift(record);
+    if (this.executionHistory.length > EXECUTION_HISTORY_LIMIT) {
+      this.executionHistory.length = EXECUTION_HISTORY_LIMIT;
+    }
+  }
+
   private queueChange(change: QueuedChange): void {
     if (this.disposed) return;
     this.registerChange(change);
@@ -538,7 +593,10 @@ export class ScrippetManager {
     const now = Date.now();
     if (now - this.lastChangeAt < 500) {
       this.changeBurst += 1;
-      this.reloadDelay = Math.min(this.maxReloadDelay, this.baseReloadDelay + this.changeBurst * 100);
+      this.reloadDelay = Math.min(
+        this.maxReloadDelay,
+        this.baseReloadDelay + this.changeBurst * 100,
+      );
     } else {
       this.changeBurst = 1;
       this.reloadDelay = this.baseReloadDelay;
@@ -553,7 +611,9 @@ export class ScrippetManager {
       this.reloadTimer = null;
       this.changeBurst = 0;
       this.reloadDelay = this.baseReloadDelay;
-      void this.processPendingChanges();
+      void this.reloadQueue.run(async () => {
+        await this.processPendingChanges();
+      });
     }, this.reloadDelay);
   }
 
@@ -583,7 +643,10 @@ export class ScrippetManager {
     const changes = this.pendingChanges;
     this.pendingChanges = createPendingChanges();
 
-    if (changes.full || (this.duplicates.size > 0 && (changes.changed.size > 0 || changes.deleted.size > 0))) {
+    if (
+      changes.full ||
+      (this.duplicates.size > 0 && (changes.changed.size > 0 || changes.deleted.size > 0))
+    ) {
       await this.performFullReload({ runStartup: false });
       return;
     }
@@ -755,12 +818,18 @@ export class ScrippetManager {
 
   private updateLastScan(): void {
     const descriptors = Array.from(this.descriptorsByPath.values());
-    const commands = descriptors.filter((descriptor) => descriptor.kind === "command").sort(sortByName);
-    const startup = descriptors.filter((descriptor) => descriptor.kind === "startup").sort(sortByName);
+    const commands = descriptors
+      .filter((descriptor) => descriptor.kind === "command")
+      .sort(sortByName);
+    const startup = descriptors
+      .filter((descriptor) => descriptor.kind === "startup")
+      .sort(sortByName);
     const errors = Array.from(this.errorMap.entries())
       .map(([path, message]) => ({ path, message }))
       .sort((a, b) => a.path.localeCompare(b.path));
-    const duplicates = Array.from(this.duplicates.values()).sort((a, b) => a.path.localeCompare(b.path));
+    const duplicates = Array.from(this.duplicates.values()).sort((a, b) =>
+      a.path.localeCompare(b.path),
+    );
     this.lastScan = { commands, startup, errors, duplicates };
   }
 
@@ -798,3 +867,6 @@ function appendSourceUrl(source: string, path: string): string {
   return `${source}\n${marker}<vault>/${normalized}`;
 }
 
+function toErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}

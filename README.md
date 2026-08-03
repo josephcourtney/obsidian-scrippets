@@ -8,12 +8,14 @@ Obsidian Scrippets lets you author small JavaScript “scrippets” right inside
 - Configurable scrippet folder under the vault config directory with live reload on file create, modify, rename, or delete.
 - Automatic metadata parsing from header comments for stable IDs, names, and descriptions.
 - Per-scrippet enable/disable switches, first-run confirmation, and manual run buttons.
-- Startup folder support with explicit opt-in and per-file toggles.
+- Startup folder support with explicit opt-in, per-file toggles, and one-time approval for untrusted startup scrippets.
+- Per-scrippet overlap protection while an invocation is still running.
+- A bounded, session-local recent execution log with duration and failure details.
 - Settings UI to pick the folder, reload, inspect load errors, and add new templates.
 
 ## Security
 
-Scrippets execute with the same privileges as Obsidian. They can read, write, or delete any file in your vault and interact with the DOM. Only install scripts you trust, review the source, and enable **Run startup scripts at launch** only when you accept that the code runs automatically on every load.
+Scrippets execute with the same privileges as Obsidian. They can read, write, or delete any file in your vault and interact with the DOM. Only install scripts you trust, review the source, and enable **Run startup scripts at launch** only when you accept that approved code runs automatically on every load. Untrusted startup scrippets require a separate one-time approval; trusting their folder bypasses that prompt.
 
 ## Scrippet structure
 
@@ -65,7 +67,7 @@ Additional directives are ignored but preserved in the source.
 
 ### Startup scripts
 
-Files inside `<folder>/startup/` can run automatically when Obsidian loads. Enable **Run startup scripts at launch** in the settings tab to opt in. Each startup script can also be disabled individually. Errors are surfaced with `Notice` notifications so one failure does not prevent other scripts from running.
+Files inside `<folder>/startup/` can run automatically when Obsidian loads. Enable **Run startup scripts at launch** in the settings tab to opt in. Before an untrusted startup scrippet runs automatically for the first time, Scrippets asks for a separate one-time approval. This approval is independent of normal first-run history, so running the same scrippet manually does not approve unattended startup execution. Trusted folders bypass the per-file startup prompt. Each startup script can also be disabled individually. Errors are surfaced with `Notice` notifications so one failure does not prevent other scripts from running.
 
 ## Settings highlights
 
@@ -76,6 +78,10 @@ Open **Settings → Community plugins → Scrippets** to:
 - Inspect loaded commands, enable/disable them, and run them manually.
 - View load errors or skipped files (e.g., duplicate IDs).
 - Add new files via the **+** dialog, including templates for the supported export shapes.
+- See whether a scrippet is currently running.
+- Review the ten most recent entries from the current session's execution history.
+
+Reload, folder-change, rename-remediation, and file-event reconciliation are serialized so overlapping scans cannot publish state concurrently.
 
 ## Installation
 

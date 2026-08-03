@@ -27,12 +27,13 @@ Before finishing a source-code change, run `npm run check`.
 
 Also run `npm run build` when the change can affect runtime behavior, bundling, dependencies, release output, or build configuration.
 
-There is currently no automated test suite. For behavior that cannot be validated through static checks or a production build, state the relevant manual verification steps.
+Automated regression tests live under `tests/` and run as part of `npm run check`. For behavior that cannot be covered by the automated suite, state the relevant manual verification steps.
 
 ## Source Layout
 
 * `src/main.ts` — plugin lifecycle and top-level wiring.
 * `src/scrippet-manager.ts` — discovery, state, command registration, reload handling, and execution orchestration.
+* `src/execution-policy.ts` — first-run and startup-approval policy helpers.
 * `src/scrippet-loader.ts` — JavaScript evaluation and supported export-shape normalization.
 * `src/metadata.ts` — metadata parsing and updating for YAML frontmatter and comment directives.
 * `src/types.ts` — shared domain types, settings types, and defaults.

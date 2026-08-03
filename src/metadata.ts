@@ -59,7 +59,7 @@ export function buildHeaderSnippet(source: string, maxLines = 10): string {
   if (lines.length === 0) return "";
   return lines
     .map((line) => escapeHtml(line))
-    .map((line) => line.replace(/(@[\w-]+)(\s*:\s*)/g, '<mark>$1</mark>$2'))
+    .map((line) => line.replace(/(@[\w-]+)(\s*:\s*)/g, "<mark>$1</mark>$2"))
     .join("<br>");
 }
 
@@ -126,11 +126,15 @@ function applyMetadataRecord(target: ScrippetMetadata, record: Record<string, un
 
 function parseComment(block: string): Record<string, unknown> {
   const meta: Record<string, unknown> = {};
+  const body = block.replace(/^\/\*/, "").replace(/\*\/$/, "");
+
   let directive: RegExpExecArray | null;
   DIRECTIVE.lastIndex = 0;
-  while ((directive = DIRECTIVE.exec(block)) !== null) {
+
+  while ((directive = DIRECTIVE.exec(body)) !== null) {
     const key = directive[1]?.trim().toLowerCase();
     const value = directive[2]?.trim();
+
     if (!key || !value) continue;
     meta[key] = value;
   }
@@ -160,9 +164,7 @@ export function updateScrippetId(source: string, newId: string): string {
     const yaml = stringifyYaml(next).trimEnd();
     const replacement = `---\n${yaml}\n---\n`;
     return (
-      source.slice(0, parsed.frontmatter.start) +
-      replacement +
-      source.slice(parsed.frontmatter.end)
+      source.slice(0, parsed.frontmatter.start) + replacement + source.slice(parsed.frontmatter.end)
     );
   }
 
