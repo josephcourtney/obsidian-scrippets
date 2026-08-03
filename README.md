@@ -5,7 +5,7 @@ Obsidian Scrippets lets you author small JavaScript “scrippets” right inside
 ## Features
 
 - Works on desktop and mobile using the Obsidian vault adapter (no `fs` dependency).
-- Configurable scrippet folder with live reload on file create, modify, rename, or delete.
+- Configurable scrippet folder under the vault config directory with live reload on file create, modify, rename, or delete.
 - Automatic metadata parsing from header comments for stable IDs, names, and descriptions.
 - Per-scrippet enable/disable switches, first-run confirmation, and manual run buttons.
 - Startup folder support with explicit opt-in and per-file toggles.
@@ -17,13 +17,13 @@ Scrippets execute with the same privileges as Obsidian. They can read, write, or
 
 ## Scrippet structure
 
-Scrippets live in `/<vault>/<folder>/*.js`. The default folder is `.obsidian/scrippets/`. Startup scrippets go into the `startup/` sub-folder.
+Scrippets live in `/<vault>/<folder>/*.js`. By default, the folder is `<vault config dir>/scrippets/` (usually `.obsidian/scrippets/`). Startup scrippets go into the `startup/` sub-folder.
 
 Each file must expose an `invoke(plugin)` function. Three export shapes are supported:
 
 ```js
 /* @name: Toggle Wrap @id: toggle-wrap @desc: Toggle the nowrap snippet */
-class ToggleWrap {
+class Scrippet {
   async invoke(plugin) {
     const { app } = plugin;
     const snippets = app.customCss.enabledSnippets;
@@ -81,7 +81,7 @@ Open **Settings → Community plugins → Scrippets** to:
 
 1. `npm install`
 2. `npm run build`
-3. Copy `main.js`, `manifest.json`, and `styles.css` into `<Vault>/.obsidian/plugins/obsidian-scrippets/`.
+3. Copy `main.js`, `manifest.json`, and `styles.css` into `<Vault>/.obsidian/plugins/scrippets/`.
 4. Enable **Scrippets** in **Settings → Community plugins**.
 
 ## Development
@@ -89,10 +89,11 @@ Open **Settings → Community plugins → Scrippets** to:
 ```bash
 npm install
 npm run dev    # watch mode
+npm run check  # type-check + lint + tests
 npm run build  # type-check + bundle
 ```
 
-The project uses TypeScript 5, esbuild, and ESLint. Source files live in `src/` and bundle to `main.js`.
+The project uses TypeScript 5, esbuild, ESLint, and Node's test runner via `tsx`. Source files live in `src/` and bundle to `main.js`.
 
 ## Versioning
 
@@ -134,3 +135,4 @@ obsidian-scrippets/
 - [Obsidian API docs](https://docs.obsidian.md)
 - [Sample plugin](https://github.com/obsidianmd/obsidian-sample-plugin)
 - [Developer policies](https://docs.obsidian.md/Developer+policies)
+

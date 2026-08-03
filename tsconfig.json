@@ -9,7 +9,11 @@
     "lib": [
       "DOM",
       "ES2020"
-    ]
+    ],
+    "allowImportingTsExtensions": true
   },
-  "include": ["src/**/*.ts"]
+  "include": [
+    "src/**/*.ts",
+    "tests/**/*.ts"
+  ]
 }

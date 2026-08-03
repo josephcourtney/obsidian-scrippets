@@ -43,7 +43,7 @@ export const DEFAULT_SETTINGS: ScrippetPluginSettings = {
   confirmBeforeFirstRun: true,
   scriptStates: {},
   startupAcknowledged: false,
-  allowedExtensions: [".js", ".mjs", ".cjs"],
+  allowedExtensions: [".js", ".cjs"],
   listSort: { field: "name", direction: "asc" },
   trustedFolders: [],
 };
@@ -80,3 +80,4 @@ export interface ScrippetListSort {
   field: ScrippetSortField;
   direction: "asc" | "desc";
 }
+

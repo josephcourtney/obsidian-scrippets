@@ -18,13 +18,13 @@ interface TemplateContext {
 const TEMPLATES: TemplateOption[] = [
   {
     id: "class",
-    label: "Class declaration",
-    description: "Defines a class with invoke(plugin).",
+    label: "Scrippet class",
+    description: "Defines the conventional Scrippet class with invoke(plugin).",
     build: ({ name, id, description }) => {
       const header = renderHeader(name, id, description);
       return (
         header +
-        `class ${pascalCase(id)} {
+        `const Scrippet = class ${pascalCase(id)} {
   async invoke(plugin) {
     try {
       const { app } = plugin;
@@ -240,3 +240,4 @@ function pascalCase(value: string): string {
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join("") || "Scrippet";
 }
+

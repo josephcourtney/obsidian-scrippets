@@ -71,6 +71,7 @@ export class ScrippetManager {
   private duplicates = new Map<string, ScrippetDuplicate>();
   private readCache = new Map<string, string>();
   private cacheActive = false;
+  private disposed = false;
   private lastScan: ScrippetScanResult = {
     commands: [],
     startup: [],
@@ -96,18 +97,30 @@ export class ScrippetManager {
   }
 
   async initialize(): Promise<void> {
+    if (this.disposed) return;
     await this.ensureFolders();
-    await this.performFullReload({ runStartup: this.plugin.settings.runStartupOnLoad });
+    await this.performFullReload({ runStartup: false });
     this.registerWatchers();
   }
 
+  destroy(): void {
+    this.disposed = true;
+    if (this.reloadTimer != null) {
+      window.clearTimeout(this.reloadTimer);
+      this.reloadTimer = null;
+    }
+    this.pendingChanges = createPendingChanges();
+    this.listeners.clear();
+  }
+
   async setFolder(newFolder: string): Promise<void> {
-    const normalized = normalizePath(newFolder.trim() || DEFAULT_SETTINGS.folder);
+    const fallbackFolder = normalizePath(`${this.plugin.app.vault.configDir}/scrippets`);
+    const normalized = normalizePath(newFolder.trim() || fallbackFolder);
     if (normalized === this.plugin.settings.folder) return;
     this.plugin.settings.folder = normalized;
     await this.plugin.saveSettings();
     await this.ensureFolders();
-    await this.performFullReload({ runStartup: this.plugin.settings.runStartupOnLoad });
+    await this.performFullReload({ runStartup: false });
   }
 
   async reload(options: { runStartup?: boolean } = {}): Promise<void> {
@@ -145,7 +158,7 @@ export class ScrippetManager {
     return `${COMMAND_PREFIX}:${id}`;
   }
 
-  async renameScrippetId(path: string, previousId: string, newId: string): Promise<void> {
+  async renameScrippetId(path: string, _previousId: string, newId: string): Promise<void> {
     const normalized = normalizePath(path);
     const adapter = this.plugin.app.vault.adapter;
     const source = await this.readFile(normalized, false);
@@ -153,14 +166,7 @@ export class ScrippetManager {
     if (updated === source) return;
     await adapter.write(normalized, updated);
     this.invalidateCachedPath(normalized);
-    if (previousId !== newId) {
-      this.descriptorsById.delete(previousId);
-      this.instanceCache.delete(previousId);
-    }
-    await this.refreshDescriptor(normalized);
-    await this.flushSettings();
-    this.updateLastScan();
-    this.notify();
+    await this.performFullReload({ runStartup: false });
   }
 
   private get baseFolder(): string {
@@ -385,19 +391,27 @@ export class ScrippetManager {
     const startupDescriptors: ScrippetDescriptor[] = [];
     const processedIds = new Set<string>();
 
-    await Promise.all(
-      commandFiles.map(async (path) => {
-        const descriptor = await this.tryBuildDescriptor(path, "command", processedIds, errors, duplicates);
-        if (descriptor) commandDescriptors.push(descriptor);
-      }),
-    );
+    for (const path of commandFiles) {
+      const descriptor = await this.tryBuildDescriptor(
+        path,
+        "command",
+        processedIds,
+        errors,
+        duplicates,
+      );
+      if (descriptor) commandDescriptors.push(descriptor);
+    }
 
-    await Promise.all(
-      startupFiles.map(async (path) => {
-        const descriptor = await this.tryBuildDescriptor(path, "startup", processedIds, errors, duplicates);
-        if (descriptor) startupDescriptors.push(descriptor);
-      }),
-    );
+    for (const path of startupFiles) {
+      const descriptor = await this.tryBuildDescriptor(
+        path,
+        "startup",
+        processedIds,
+        errors,
+        duplicates,
+      );
+      if (descriptor) startupDescriptors.push(descriptor);
+    }
 
     commandDescriptors.sort(sortByName);
     startupDescriptors.sort(sortByName);
@@ -464,7 +478,7 @@ export class ScrippetManager {
         .filter((file) => this.isAllowedExtension(file))
         .map((file) => normalizePath(file))
         .filter((file) => (filter ? filter(file) : true));
-      return files;
+      return files.sort((a, b) => a.localeCompare(b));
     } catch (error) {
       console.debug(`Scrippets: unable to list ${folder}`, error);
       return [];
@@ -517,6 +531,7 @@ export class ScrippetManager {
   }
 
   private queueChange(change: QueuedChange): void {
+    if (this.disposed) return;
     this.registerChange(change);
     if (change.path) this.invalidateCachedPath(change.path);
 
@@ -564,10 +579,11 @@ export class ScrippetManager {
   }
 
   private async processPendingChanges(): Promise<void> {
+    if (this.disposed) return;
     const changes = this.pendingChanges;
     this.pendingChanges = createPendingChanges();
 
-    if (changes.full) {
+    if (changes.full || (this.duplicates.size > 0 && (changes.changed.size > 0 || changes.deleted.size > 0))) {
       await this.performFullReload({ runStartup: false });
       return;
     }
@@ -781,3 +797,4 @@ function appendSourceUrl(source: string, path: string): string {
   if (source.includes(marker)) return source;
   return `${source}\n${marker}<vault>/${normalized}`;
 }
+

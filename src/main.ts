@@ -1,4 +1,4 @@
-import { Plugin } from "obsidian";
+import { Notice, Plugin, normalizePath } from "obsidian";
 import { ScrippetManager } from "./scrippet-manager";
 import { DEFAULT_SETTINGS, type ScrippetPluginSettings } from "./types";
 import { ScrippetSettingTab } from "./ui/settings-tab";
@@ -10,20 +10,40 @@ export default class ScrippetPlugin extends Plugin {
   async onload(): Promise<void> {
     await this.loadSettings();
     this.manager = new ScrippetManager(this);
-    await this.manager.initialize();
     this.addSettingTab(new ScrippetSettingTab(this.app, this));
+
+    this.app.workspace.onLayoutReady(() => {
+      void this.initializeManager();
+    });
   }
 
   onunload(): void {
-    // Manager registers commands and events via plugin helper methods; Obsidian handles cleanup.
+    this.manager?.destroy();
   }
 
   async loadSettings(): Promise<void> {
     const data = (await this.loadData()) as Partial<ScrippetPluginSettings> | null;
-    this.settings = { ...DEFAULT_SETTINGS, ...(data ?? {}) };
+    const defaultFolder = normalizePath(`${this.app.vault.configDir}/scrippets`);
+    this.settings = {
+      ...DEFAULT_SETTINGS,
+      folder: defaultFolder,
+      ...(data ?? {}),
+    };
   }
 
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
+  }
+
+  private async initializeManager(): Promise<void> {
+    try {
+      await this.manager.initialize();
+      if (this.settings.runStartupOnLoad) {
+        await this.manager.runStartupScripts();
+      }
+    } catch (error) {
+      console.error("Scrippets: failed to initialize", error);
+      new Notice(`Scrippets failed to initialize: ${(error as Error).message ?? String(error)}`);
+    }
   }
 }

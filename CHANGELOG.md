@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file. Dates use the ISO 8601 format (YYYY-MM-DD).
 
+## [1.4.0] - 2026-08-03
+### Added
+- Add regression tests for supported runtime export shapes and include tests in `npm run check`.
+- Add a root MIT `LICENSE` file for Community Plugins submission readiness.
+
+### Changed
+- Rename the unreleased plugin id from `obsidian-scrippets` to `scrippets`.
+- Resolve the default scrippet folder from Obsidian's configured vault config directory instead of hardcoding `.obsidian`.
+- Defer manager initialization and startup-script execution until the workspace layout is ready.
+- Make folder changes explicit with an Apply button and prevent folder changes from executing startup scripts.
+- Restrict configurable script extensions to `.js` and `.cjs`; `.mjs` files were never evaluated as real ES modules.
+- Make full-scan duplicate-id selection deterministic by processing normalized paths in sorted order.
+
+### Fixed
+- Fix runtime export resolution so empty `module.exports` no longer masks `Scrippet`, `defaultExport`, or bare `invoke` forms.
+- Fix generated class templates so they use the supported `Scrippet` convention.
+- Re-scan after duplicate-id remediation and when conflicts change so valid scripts recover without requiring a manual reload.
+- Cancel pending reload timers when the plugin unloads.
+
 ## [1.3.0] - 2025-09-24
 ### Added
 - Document metadata-first scanning with header previews and accessible first-run modals introduced after 1.1.1.
@@ -45,7 +64,9 @@ All notable changes to this project will be documented in this file. Dates use t
 ### Added
 - Initial release with basic command loading and startup script execution.
 
+[1.4.0]: https://github.com/josephcourtney/obsidian-scrippets/releases/tag/1.4.0
 [1.1.1]: https://github.com/josephcourtney/obsidian-scrippets/releases/tag/1.1.1
 [1.1.0]: https://github.com/josephcourtney/obsidian-scrippets/releases/tag/1.1.0
 [1.0.1]: https://github.com/josephcourtney/obsidian-scrippets/releases/tag/1.0.1
 [1.0.0]: https://github.com/josephcourtney/obsidian-scrippets/releases/tag/1.0.0
+

@@ -10,7 +10,7 @@ const SORT_LABELS: Record<ScrippetSortField, string> = {
   enabled: "Enabled",
 };
 
-const EXTENSION_OPTIONS = [".js", ".mjs", ".cjs"] as const;
+const EXTENSION_OPTIONS = [".js", ".cjs"] as const;
 
 export class ScrippetSettingTab extends PluginSettingTab {
   private readonly plugin: ScrippetPlugin;
@@ -45,16 +45,15 @@ export class ScrippetSettingTab extends PluginSettingTab {
   }
 
   private renderHeader(container: HTMLElement): void {
-    const header = container.createDiv({ cls: "scrippet-header" });
-    header.createEl("h2", { text: "Scrippets" });
-
-    const actions = header.createDiv({ cls: "scrippet-header-actions" });
-    const copyButton = actions.createEl("button", { cls: "scrippet-icon-button", type: "button" });
-    copyButton.setAttr("aria-label", "Copy scrippets folder path");
-    setIcon(copyButton, "copy");
-    copyButton.addEventListener("click", () => {
-      void this.copyFolderPath();
-    });
+    const heading = new Setting(container).setName("Scrippets").setHeading();
+    heading.addExtraButton((button) =>
+      button
+        .setIcon("copy")
+        .setTooltip("Copy scrippets folder path")
+        .onClick(() => {
+          void this.copyFolderPath();
+        }),
+    );
   }
 
   private renderSecurityNotice(container: HTMLElement): void {
@@ -66,18 +65,22 @@ export class ScrippetSettingTab extends PluginSettingTab {
   }
 
   private renderFolderSetting(container: HTMLElement): void {
-    new Setting(container)
+    let draft = this.plugin.settings.folder;
+    const setting = new Setting(container)
       .setName("Scrippets folder")
-      .setDesc("Relative path inside your vault where scrippets are stored.")
-      .addText((text) =>
-        text
-          .setValue(this.plugin.settings.folder)
-          .onChange(async (value) => {
-            await this.plugin.manager.setFolder(value);
-            text.setValue(this.plugin.settings.folder);
-            this.display();
-          }),
-      );
+      .setDesc("Relative path inside your vault where scrippets are stored.");
+
+    setting.addText((text) =>
+      text.setValue(draft).onChange((value) => {
+        draft = value;
+      }),
+    );
+    setting.addButton((button) =>
+      button.setButtonText("Apply").onClick(async () => {
+        await this.plugin.manager.setFolder(draft);
+        this.display();
+      }),
+    );
   }
 
   private renderTrustControls(container: HTMLElement): void {
@@ -530,3 +533,4 @@ export class ScrippetSettingTab extends PluginSettingTab {
     await this.plugin.saveSettings();
   }
 }
+
