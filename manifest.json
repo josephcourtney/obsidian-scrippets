@@ -1,10 +1,10 @@
 {
-  "id": "scrippets",
-  "name": "Scrippets",
-  "version": "1.4.1",
-  "minAppVersion": "1.5.0",
-  "description": "Run and manage custom JavaScript scrippets with hot reload and metadata.",
-  "author": "Joseph Courtney",
-  "authorUrl": "https://github.com/josephcourtney/obsidian-scrippets",
-  "isDesktopOnly": false
+	"id": "scrippets",
+	"name": "Scrippets",
+	"version": "1.5.0",
+	"minAppVersion": "1.5.0",
+	"description": "Run and manage custom JavaScript scrippets with hot reload and metadata.",
+	"author": "Joseph Courtney",
+	"authorUrl": "https://github.com/josephcourtney/obsidian-scrippets",
+	"isDesktopOnly": false
 }
