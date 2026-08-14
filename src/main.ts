@@ -2,7 +2,7 @@ import { Notice, Plugin, normalizePath } from "obsidian";
 import { ScrippetParameterCssRegistry } from "./parameter-css";
 import { ScrippetManager } from "./scrippet-manager";
 import { DEFAULT_SETTINGS, type ScrippetPluginSettings } from "./types";
-import { ScrippetSettingTab } from "./ui/settings-tab";
+import { ParameterizedScrippetSettingTab } from "./ui/parameter-settings-tab";
 
 export default class ScrippetPlugin extends Plugin {
   settings: ScrippetPluginSettings = DEFAULT_SETTINGS;
@@ -12,7 +12,7 @@ export default class ScrippetPlugin extends Plugin {
   async onload(): Promise<void> {
     await this.loadSettings();
     this.manager = new ScrippetManager(this);
-    this.addSettingTab(new ScrippetSettingTab(this.app, this));
+    this.addSettingTab(new ParameterizedScrippetSettingTab(this.app, this));
 
     this.app.workspace.onLayoutReady(() => {
       void this.initializeManager();
