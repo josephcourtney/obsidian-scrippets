@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file. Dates use t
 ## [Unreleased]
 ### Added
 - Add `@requires-snippet` metadata so scrippets can declare CSS snippet file dependencies that are checked before invocation.
+- Add typed per-scrippet parameters declared through YAML frontmatter, persisted by scrippet ID, rendered in the settings panel, and passed to `invoke(plugin, settings)`.
+- Add optional `css-var` bindings so parameter values can configure dependent CSS snippets through custom properties.
+
+### Changed
+- Extend the nowrap example with configurable cursor margin, fade width, and scrollbar clearance plus a matching CSS snippet example.
+
+### Fixed
+- Mask YAML frontmatter before JavaScript evaluation so frontmatter-based scrippets remain executable while preserving source line layout.
 
 ## [1.5.0] - 2026-08-03
 ### Added
