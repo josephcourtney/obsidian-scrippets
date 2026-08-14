@@ -40,7 +40,7 @@ export function parseScrippetMetadata(source: string): ParsedMetadata {
         raw,
         data,
       };
-      applyMetadataRecord(metadata, data);
+      applyMetadataRecord(metadata, data, true);
     }
   }
 
@@ -119,13 +119,17 @@ function safeParseYaml(raw: string): Record<string, unknown> | null {
   return null;
 }
 
-function applyMetadataRecord(target: ScrippetMetadata, record: Record<string, unknown>): void {
+function applyMetadataRecord(
+  target: ScrippetMetadata,
+  record: Record<string, unknown>,
+  allowStructured = false,
+): void {
   for (const [key, rawValue] of Object.entries(record)) {
     const normalized = key.trim().toLowerCase();
     if (!normalized) continue;
 
     if (normalized === "settings") {
-      target.settings = parseScrippetParameterSchema(rawValue);
+      if (allowStructured) target.settings = parseScrippetParameterSchema(rawValue);
       continue;
     }
 
