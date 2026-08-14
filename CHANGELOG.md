@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file. Dates use the ISO 8601 format (YYYY-MM-DD).
 
+## [Unreleased]
+### Added
+- Add `@requires-snippet` metadata so scrippets can declare CSS snippet file dependencies that are checked before invocation.
+
 ## [1.5.0] - 2026-08-03
 ### Added
 - Add bounded, session-local execution history with trigger, duration, status, and error details.
