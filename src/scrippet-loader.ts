@@ -1,4 +1,5 @@
 import { Notice, normalizePath, type Plugin } from "obsidian";
+import { resolveCssSnippetRuntimeValues } from "./css-snippet-parameters";
 import {
   maskScrippetFrontmatter,
   parseScrippetMetadata,
@@ -8,14 +9,19 @@ import { resolveScrippetParameterValues } from "./parameters";
 import { getRequiredSnippetId } from "./snippet-dependency";
 import { evaluateScrippetSource } from "./scrippet-runtime";
 import type {
+  CssSnippetParameterSource,
   ScrippetMetadata,
   ScrippetModule,
   ScrippetParameterSchema,
+  ScrippetParameterValues,
   ScrippetPluginSettings,
 } from "./types";
 
 interface ScrippetPluginHost extends Plugin {
   settings?: Partial<ScrippetPluginSettings>;
+  snippetParameters?: {
+    get: (id: string) => CssSnippetParameterSource | undefined;
+  };
 }
 
 export function loadScrippet(plugin: Plugin, source: string): ScrippetModule {
@@ -54,18 +60,37 @@ function withScrippetFeatures(
         }
       }
 
-      const settings = schema
-        ? resolveScrippetParameterValues(schema, getSavedSettings(plugin, scrippetId))
-        : undefined;
-      return instance.invoke(plugin, settings);
+      const saved = getSavedSettings(plugin, scrippetId);
+      const snippetValues = getSnippetRuntimeSettings(plugin, snippetId, saved);
+      const scrippetValues = schema ? resolveScrippetParameterValues(schema, saved) : {};
+      const settings = {
+        ...snippetValues,
+        ...scrippetValues,
+      };
+
+      return instance.invoke(plugin, Object.keys(settings).length > 0 ? settings : undefined);
     },
   };
 }
 
-function getSavedSettings(plugin: Plugin, scrippetId: string | undefined) {
+function getSavedSettings(
+  plugin: Plugin,
+  scrippetId: string | undefined,
+): ScrippetParameterValues | undefined {
   if (!scrippetId) return undefined;
   const host = plugin as ScrippetPluginHost;
   return host.settings?.scrippetSettings?.[scrippetId];
+}
+
+function getSnippetRuntimeSettings(
+  plugin: Plugin,
+  snippetId: string | undefined,
+  saved: ScrippetParameterValues | undefined,
+): ScrippetParameterValues {
+  if (!snippetId) return {};
+  const host = plugin as ScrippetPluginHost;
+  const source = host.snippetParameters?.get(snippetId);
+  return resolveCssSnippetRuntimeValues(source?.settings, saved);
 }
 
 function resolveScrippetId(source: string, metadata: ScrippetMetadata): string | undefined {
