@@ -1,4 +1,9 @@
-/* @name: Toggle Wrap @id: toggle-wrap @desc: Toggle the "nowrap" CSS snippet */
+/*
+ * @name: Toggle Wrap
+ * @id: toggle-wrap
+ * @desc: Toggle the "nowrap" CSS snippet
+ * @requires-snippet: nowrap
+ */
 class ToggleLineWrap {
   async invoke(plugin) {
     const { customCss } = plugin.app;
