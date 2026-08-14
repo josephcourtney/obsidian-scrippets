@@ -141,7 +141,7 @@ export class ParameterizedScrippetSettingTab extends ScrippetSettingTab {
       const max = definition.max ?? 100;
       const step = definition.step ?? 1;
       setting.addSlider((slider) => {
-        slider.setLimits(min, max, step).setValue(value);
+        slider.setLimits(min, max, step).setValue(value).setInstant(true);
         setSliderValue = (next) => slider.setValue(next);
         slider.onChange(async (next) => {
           if (numberInput) numberInput.value = String(next);
