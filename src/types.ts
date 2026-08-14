@@ -5,6 +5,7 @@ export interface ScrippetMetadata {
   name?: string;
   desc?: string;
   description?: string;
+  "requires-snippet"?: string;
 }
 
 export type ScrippetKind = "command" | "startup";
