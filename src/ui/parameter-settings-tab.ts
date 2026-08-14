@@ -2,7 +2,9 @@ import { App, Notice, Setting } from "obsidian";
 import type ScrippetPlugin from "../main";
 import {
   coerceScrippetParameterValue,
+  resolveScrippetParameterCssVarName,
   resolveScrippetParameterValues,
+  shouldUseScrippetParameterSlider,
 } from "../parameters";
 import type {
   ScrippetDescriptor,
@@ -34,7 +36,9 @@ export class ParameterizedScrippetSettingTab extends ScrippetSettingTab {
 
     new Setting(this.containerEl)
       .setName("Scrippet parameters")
-      .setDesc("Values are stored by scrippet ID and passed to invoke(plugin, settings).")
+      .setDesc(
+        "Tune values declared by each scrippet. Changes are saved by scrippet ID and passed to invoke(plugin, settings).",
+      )
       .setHeading();
 
     const section = this.containerEl.createDiv({ cls: "scrippet-parameter-section" });
@@ -58,12 +62,15 @@ export class ParameterizedScrippetSettingTab extends ScrippetSettingTab {
 
     if (this.hasSavedValues(descriptor.id)) {
       header.addButton((button) =>
-        button.setButtonText("Reset").setTooltip("Reset parameters to defaults").onClick(async () => {
-          delete this.scrippetPlugin.settings.scrippetSettings[descriptor.id];
-          await this.scrippetPlugin.saveSettings();
-          this.syncParameterCss();
-          this.redisplayPreservingScroll();
-        }),
+        button
+          .setButtonText("Reset all")
+          .setTooltip("Reset all parameters to their defaults")
+          .onClick(async () => {
+            delete this.scrippetPlugin.settings.scrippetSettings[descriptor.id];
+            await this.scrippetPlugin.saveSettings();
+            this.syncParameterCss();
+            this.redisplayPreservingScroll();
+          }),
       );
     }
 
@@ -86,6 +93,7 @@ export class ParameterizedScrippetSettingTab extends ScrippetSettingTab {
   ): void {
     const setting = new Setting(container).setName(definition.label);
     if (definition.description) setting.setDesc(definition.description);
+    this.renderParameterDetails(setting, descriptor, key, definition);
 
     if (definition.type === "boolean") {
       setting.addToggle((toggle) =>
@@ -93,10 +101,7 @@ export class ParameterizedScrippetSettingTab extends ScrippetSettingTab {
           await this.saveParameterValue(descriptor, key, definition, next);
         }),
       );
-      return;
-    }
-
-    if (definition.type === "select") {
+    } else if (definition.type === "select") {
       setting.addDropdown((dropdown) => {
         for (const option of definition.options ?? []) {
           dropdown.addOption(option.value, option.label);
@@ -105,32 +110,122 @@ export class ParameterizedScrippetSettingTab extends ScrippetSettingTab {
           await this.saveParameterValue(descriptor, key, definition, next);
         });
       });
-      return;
+    } else if (definition.type === "number") {
+      this.renderNumberControl(setting, descriptor, key, definition, Number(value));
+    } else {
+      this.renderTextControl(setting, descriptor, key, definition, String(value));
+    }
+
+    setting.addExtraButton((button) =>
+      button
+        .setIcon("rotate-ccw")
+        .setTooltip(`Reset to default (${this.formatParameterValue(definition, definition.default)})`)
+        .onClick(async () => {
+          await this.resetParameterValue(descriptor, key);
+        }),
+    );
+  }
+
+  private renderNumberControl(
+    setting: Setting,
+    descriptor: ScrippetDescriptor,
+    key: string,
+    definition: ScrippetParameterDefinition,
+    value: number,
+  ): void {
+    let setSliderValue: ((next: number) => void) | undefined;
+    let numberInput: HTMLInputElement | undefined;
+
+    if (shouldUseScrippetParameterSlider(definition)) {
+      const min = definition.min ?? 0;
+      const max = definition.max ?? 100;
+      const step = definition.step ?? 1;
+      setting.addSlider((slider) => {
+        slider.setLimits(min, max, step).setValue(value);
+        setSliderValue = (next) => slider.setValue(next);
+        slider.onChange(async (next) => {
+          if (numberInput) numberInput.value = String(next);
+          await this.saveParameterValue(descriptor, key, definition, next);
+        });
+      });
     }
 
     setting.addText((text) => {
+      numberInput = text.inputEl;
+      text.inputEl.addClass("scrippet-parameter-number-input");
       text.setValue(String(value));
-      if (definition.type === "number") {
-        text.inputEl.type = "number";
-        if (definition.min != null) text.inputEl.min = String(definition.min);
-        if (definition.max != null) text.inputEl.max = String(definition.max);
-        if (definition.step != null) text.inputEl.step = String(definition.step);
-      }
+      text.inputEl.type = "number";
+      if (definition.min != null) text.inputEl.min = String(definition.min);
+      if (definition.max != null) text.inputEl.max = String(definition.max);
+      if (definition.step != null) text.inputEl.step = String(definition.step);
       text.onChange(async (next) => {
-        if (definition.type === "number" && next.trim() === "") return;
+        if (next.trim() === "") return;
         try {
-          await this.saveParameterValue(descriptor, key, definition, next);
-          text.inputEl.classList.remove("scrippet-parameter-invalid");
+          const coerced = coerceScrippetParameterValue(definition, next);
+          const numeric = Number(coerced);
+          setSliderValue?.(numeric);
+          text.setValue(String(numeric));
+          await this.saveParameterValue(descriptor, key, definition, numeric);
+          text.inputEl.removeClass("scrippet-parameter-invalid");
         } catch (error) {
-          text.inputEl.classList.add("scrippet-parameter-invalid");
+          text.inputEl.addClass("scrippet-parameter-invalid");
           console.debug(`Scrippets: invalid parameter ${descriptor.id}.${key}`, error);
         }
       });
     });
 
-    if (definition.type === "number" && definition.unit) {
+    if (definition.unit) {
       setting.controlEl.createSpan({ cls: "scrippet-parameter-unit", text: definition.unit });
     }
+  }
+
+  private renderTextControl(
+    setting: Setting,
+    descriptor: ScrippetDescriptor,
+    key: string,
+    definition: ScrippetParameterDefinition,
+    value: string,
+  ): void {
+    setting.addText((text) => {
+      text.setValue(value).onChange(async (next) => {
+        try {
+          await this.saveParameterValue(descriptor, key, definition, next);
+          text.inputEl.removeClass("scrippet-parameter-invalid");
+        } catch (error) {
+          text.inputEl.addClass("scrippet-parameter-invalid");
+          console.debug(`Scrippets: invalid parameter ${descriptor.id}.${key}`, error);
+        }
+      });
+    });
+  }
+
+  private renderParameterDetails(
+    setting: Setting,
+    descriptor: ScrippetDescriptor,
+    key: string,
+    definition: ScrippetParameterDefinition,
+  ): void {
+    const details = setting.descEl.createDiv({ cls: "scrippet-parameter-details" });
+    details.createSpan({
+      cls: "scrippet-parameter-default",
+      text: `Default: ${this.formatParameterValue(definition, definition.default)}`,
+    });
+
+    const cssVar = resolveScrippetParameterCssVarName(descriptor.id, key, definition);
+    if (cssVar) {
+      const cssDetail = details.createSpan({ cls: "scrippet-parameter-css-var" });
+      cssDetail.createSpan({ text: "CSS: " });
+      cssDetail.createEl("code", { text: cssVar });
+    }
+  }
+
+  private formatParameterValue(
+    definition: ScrippetParameterDefinition,
+    value: ScrippetParameterValue,
+  ): string {
+    if (definition.type === "number") return `${value}${definition.unit ?? ""}`;
+    if (definition.type === "boolean") return value ? "On" : "Off";
+    return String(value);
   }
 
   private async saveParameterValue(
@@ -147,13 +242,30 @@ export class ParameterizedScrippetSettingTab extends ScrippetSettingTab {
     };
 
     try {
-      await this.scrippetPlugin.saveSettings();
       this.syncParameterCss();
+      await this.scrippetPlugin.saveSettings();
     } catch (error) {
       console.error("Scrippets: failed to save parameter value", error);
       new Notice("Failed to save scrippet parameter.");
       throw error;
     }
+  }
+
+  private async resetParameterValue(descriptor: ScrippetDescriptor, key: string): Promise<void> {
+    const current = this.scrippetPlugin.settings.scrippetSettings[descriptor.id];
+    if (!current || !Object.prototype.hasOwnProperty.call(current, key)) return;
+
+    const next = { ...current };
+    delete next[key];
+    if (Object.keys(next).length === 0) {
+      delete this.scrippetPlugin.settings.scrippetSettings[descriptor.id];
+    } else {
+      this.scrippetPlugin.settings.scrippetSettings[descriptor.id] = next;
+    }
+
+    await this.scrippetPlugin.saveSettings();
+    this.syncParameterCss();
+    this.redisplayPreservingScroll();
   }
 
   private getParameterizedDescriptors(): ScrippetDescriptor[] {
