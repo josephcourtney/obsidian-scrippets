@@ -1,5 +1,6 @@
 import {
   formatScrippetParameterCssValue,
+  resolveScrippetParameterCssVarName,
   resolveScrippetParameterValues,
 } from "./parameters";
 import type { ScrippetDescriptor, ScrippetParameterValues } from "./types";
@@ -27,9 +28,10 @@ export class ScrippetParameterCssRegistry {
       const values = resolveScrippetParameterValues(schema, savedById[descriptor.id]);
 
       for (const [key, definition] of Object.entries(schema)) {
-        if (!definition.cssVar) continue;
+        const name = resolveScrippetParameterCssVarName(descriptor.id, key, definition);
+        if (!name) continue;
         next.set(
-          definition.cssVar,
+          name,
           formatScrippetParameterCssValue(definition, values[key] ?? definition.default),
         );
       }
