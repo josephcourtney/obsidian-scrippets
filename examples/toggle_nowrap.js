@@ -12,7 +12,8 @@
     "min": 0,
     "max": 200,
     "step": 1,
-    "unit": "px"
+    "unit": "px",
+    "control": "slider"
   },
   "fade-width": {
     "type": "number",
@@ -23,7 +24,8 @@
     "max": 100,
     "step": 1,
     "unit": "px",
-    "css-var": "--scrippets-nowrap-fade-width"
+    "control": "slider",
+    "css-var": true
   },
   "scrollbar-offset": {
     "type": "number",
@@ -34,7 +36,8 @@
     "max": 40,
     "step": 1,
     "unit": "px",
-    "css-var": "--scrippets-nowrap-scrollbar-offset"
+    "control": "slider",
+    "css-var": true
   }
 }
 */
