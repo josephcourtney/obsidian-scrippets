@@ -1,38 +1,82 @@
 import { Notice, normalizePath, type Plugin } from "obsidian";
-import { parseScrippetMetadata } from "./metadata";
+import {
+  maskScrippetFrontmatter,
+  parseScrippetMetadata,
+  toIdentifier,
+} from "./metadata";
+import { resolveScrippetParameterValues } from "./parameters";
 import { getRequiredSnippetId } from "./snippet-dependency";
 import { evaluateScrippetSource } from "./scrippet-runtime";
-import type { ScrippetModule } from "./types";
+import type {
+  ScrippetMetadata,
+  ScrippetModule,
+  ScrippetParameterSchema,
+  ScrippetPluginSettings,
+} from "./types";
+
+interface ScrippetPluginHost extends Plugin {
+  settings?: Partial<ScrippetPluginSettings>;
+}
 
 export function loadScrippet(plugin: Plugin, source: string): ScrippetModule {
-  const { metadata } = parseScrippetMetadata(source);
+  const parsed = parseScrippetMetadata(source);
+  const { metadata } = parsed;
   const requiredSnippetId = getRequiredSnippetId(metadata);
-  const mod = evaluateScrippetSource(plugin, plugin.app, Notice, source);
+  const scrippetId = resolveScrippetId(source, metadata);
+  const executableSource = maskScrippetFrontmatter(source, parsed);
+  const mod = evaluateScrippetSource(plugin, plugin.app, Notice, executableSource);
   const instance = typeof mod === "function" ? new (mod as new (plugin: Plugin) => unknown)(plugin) : mod;
   if (!isScrippetModule(instance)) {
     throw new Error("Scrippet must expose invoke(plugin)");
   }
-  if (!requiredSnippetId) return instance;
+  if (!requiredSnippetId && !metadata.settings) return instance;
 
-  return withSnippetDependency(instance, requiredSnippetId);
+  return withScrippetFeatures(instance, requiredSnippetId, metadata.settings, scrippetId);
 }
 
-function withSnippetDependency(instance: ScrippetModule, snippetId: string): ScrippetModule {
+function withScrippetFeatures(
+  instance: ScrippetModule,
+  snippetId: string | undefined,
+  schema: ScrippetParameterSchema | undefined,
+  scrippetId: string | undefined,
+): ScrippetModule {
   return {
     invoke: async (plugin) => {
-      const snippetPath = normalizePath(
-        `${plugin.app.vault.configDir}/snippets/${snippetId}.css`,
-      );
-      const exists = await plugin.app.vault.adapter.exists(snippetPath);
-      if (!exists) {
-        throw new Error(
-          `Required CSS snippet "${snippetId}" was not found at "${snippetPath}".`,
+      if (snippetId) {
+        const snippetPath = normalizePath(
+          `${plugin.app.vault.configDir}/snippets/${snippetId}.css`,
         );
+        const exists = await plugin.app.vault.adapter.exists(snippetPath);
+        if (!exists) {
+          throw new Error(
+            `Required CSS snippet "${snippetId}" was not found at "${snippetPath}".`,
+          );
+        }
       }
 
-      return instance.invoke(plugin);
+      const settings = schema
+        ? resolveScrippetParameterValues(schema, getSavedSettings(plugin, scrippetId))
+        : undefined;
+      return instance.invoke(plugin, settings);
     },
   };
+}
+
+function getSavedSettings(plugin: Plugin, scrippetId: string | undefined) {
+  if (!scrippetId) return undefined;
+  const host = plugin as ScrippetPluginHost;
+  return host.settings?.scrippetSettings?.[scrippetId];
+}
+
+function resolveScrippetId(source: string, metadata: ScrippetMetadata): string | undefined {
+  if (metadata.id) return toIdentifier("", metadata);
+  const path = extractSourcePath(source);
+  return path ? toIdentifier(path, metadata) : undefined;
+}
+
+function extractSourcePath(source: string): string | undefined {
+  const match = /\/\/# sourceURL=<vault>\/([^\r\n]+)/.exec(source);
+  return match?.[1]?.trim() || undefined;
 }
 
 function isScrippetModule(candidate: unknown): candidate is ScrippetModule {
