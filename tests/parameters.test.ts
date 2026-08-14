@@ -82,8 +82,8 @@ test("rejects invalid schemas", () => {
   assert.throws(
     () =>
       parseScrippetParameterSchema({
-        bad: { type: "number", "css-var": "not-a-custom-property" },
+        bad: { type: "number", "css-var": "--text-normal" },
       }),
-    /invalid css-var/,
+    /must start with --scrippets-/,
   );
 });
