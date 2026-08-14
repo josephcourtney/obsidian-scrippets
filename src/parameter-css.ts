@@ -1,14 +1,24 @@
 import {
+  coerceScrippetParameterValue,
   formatScrippetParameterCssValue,
   resolveScrippetParameterCssVarName,
   resolveScrippetParameterValues,
 } from "./parameters";
-import type { ScrippetDescriptor, ScrippetParameterValues } from "./types";
+import { getRequiredSnippetId } from "./snippet-dependency";
+import type {
+  CssSnippetParameterSource,
+  ScrippetDescriptor,
+  ScrippetParameterValues,
+} from "./types";
 
 interface PreviousCssValue {
   value: string;
   priority: string;
 }
+
+export type CssSnippetParameterLookup = (
+  id: string,
+) => CssSnippetParameterSource | undefined;
 
 export class ScrippetParameterCssRegistry {
   private readonly previous = new Map<string, PreviousCssValue>();
@@ -17,23 +27,46 @@ export class ScrippetParameterCssRegistry {
   sync(
     descriptors: readonly ScrippetDescriptor[],
     savedById: Record<string, ScrippetParameterValues>,
+    getSnippet?: CssSnippetParameterLookup,
   ): void {
     const root = document.documentElement;
     const next = new Map<string, string>();
     const sorted = [...descriptors].sort((a, b) => a.id.localeCompare(b.id));
 
     for (const descriptor of sorted) {
+      const saved = savedById[descriptor.id];
       const schema = descriptor.metadata.settings;
-      if (!schema) continue;
-      const values = resolveScrippetParameterValues(schema, savedById[descriptor.id]);
+      if (schema) {
+        const values = resolveScrippetParameterValues(schema, saved);
+        for (const [key, definition] of Object.entries(schema)) {
+          const name = resolveScrippetParameterCssVarName(descriptor.id, key, definition);
+          if (!name) continue;
+          next.set(
+            name,
+            formatScrippetParameterCssValue(definition, values[key] ?? definition.default),
+          );
+        }
+      }
 
-      for (const [key, definition] of Object.entries(schema)) {
-        const name = resolveScrippetParameterCssVarName(descriptor.id, key, definition);
-        if (!name) continue;
-        next.set(
-          name,
-          formatScrippetParameterCssValue(definition, values[key] ?? definition.default),
-        );
+      if (!getSnippet || !saved) continue;
+      let snippetId: string | undefined;
+      try {
+        snippetId = getRequiredSnippetId(descriptor.metadata);
+      } catch {
+        continue;
+      }
+      if (!snippetId) continue;
+      const snippetSchema = getSnippet(snippetId)?.settings;
+      if (!snippetSchema) continue;
+
+      for (const [key, definition] of Object.entries(snippetSchema)) {
+        if (!Object.prototype.hasOwnProperty.call(saved, key)) continue;
+        try {
+          const value = coerceScrippetParameterValue(definition, saved[key]);
+          next.set(definition.cssVar, formatScrippetParameterCssValue(definition, value));
+        } catch {
+          // Invalid saved values fall back to the declaration in the CSS snippet.
+        }
       }
     }
 
