@@ -30,7 +30,11 @@ export class ScrippetSettingTab extends PluginSettingTab {
     super(app, plugin);
     this.plugin = plugin;
     this.plugin.manager.subscribe(() => {
-      if (this.containerEl.isConnected) this.display();
+      if (!this.containerEl.isConnected) return;
+
+      const scrollTop = this.containerEl.scrollTop;
+      this.display();
+      this.containerEl.scrollTop = scrollTop;
     });
   }
 
@@ -47,10 +51,11 @@ export class ScrippetSettingTab extends PluginSettingTab {
     this.renderConfirmToggle(containerEl);
     this.renderManageControls(containerEl);
     this.renderMessages(containerEl);
-    this.renderExecutionHistory(containerEl);
     this.renderListControls(containerEl);
 
     this.listContainer = containerEl.createDiv({ cls: "scrippet-list-sections" });
+
+    this.renderExecutionHistory(containerEl);
     this.renderResults();
   }
 

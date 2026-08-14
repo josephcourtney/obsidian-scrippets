@@ -161,6 +161,9 @@
   display: grid;
   gap: 6px;
   margin: 6px 0 16px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .scrippet-execution-record {
