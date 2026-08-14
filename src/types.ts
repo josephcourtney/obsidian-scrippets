@@ -26,6 +26,20 @@ export interface ScrippetParameterDefinition {
 export type ScrippetParameterSchema = Record<string, ScrippetParameterDefinition>;
 export type ScrippetParameterValues = Record<string, ScrippetParameterValue>;
 
+export interface CssSnippetParameterDefinition extends ScrippetParameterDefinition {
+  cssVar: string;
+  runtimeKey?: string;
+}
+
+export type CssSnippetParameterSchema = Record<string, CssSnippetParameterDefinition>;
+
+export interface CssSnippetParameterSource {
+  id: string;
+  path: string;
+  settings?: CssSnippetParameterSchema;
+  error?: string;
+}
+
 export interface ScrippetMetadata {
   [key: string]: string | ScrippetParameterSchema | undefined;
   id?: string;
