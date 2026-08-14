@@ -1,4 +1,5 @@
 import { normalizePath, parseYaml, stringifyYaml } from "obsidian";
+import { parseScrippetParameterSchema } from "./parameters";
 import type { ScrippetMetadata } from "./types";
 
 const METADATA_COMMENT = /\/\*([\s\S]*?)\*\//;
@@ -52,6 +53,14 @@ export function parseScrippetMetadata(source: string): ParsedMetadata {
   }
 
   return { metadata, source, frontmatter, comment };
+}
+
+export function maskScrippetFrontmatter(source: string, parsed: ParsedMetadata): string {
+  const frontmatter = parsed.frontmatter;
+  if (!frontmatter) return source;
+
+  const masked = frontmatter.raw.replace(/[^\r\n]/g, " ");
+  return source.slice(0, frontmatter.start) + masked + source.slice(frontmatter.end);
 }
 
 export function buildHeaderSnippet(source: string, maxLines = 10): string {
@@ -112,10 +121,16 @@ function safeParseYaml(raw: string): Record<string, unknown> | null {
 
 function applyMetadataRecord(target: ScrippetMetadata, record: Record<string, unknown>): void {
   for (const [key, rawValue] of Object.entries(record)) {
-    if (!isMetadataPrimitive(rawValue)) continue;
-    const value = String(rawValue);
     const normalized = key.trim().toLowerCase();
     if (!normalized) continue;
+
+    if (normalized === "settings") {
+      target.settings = parseScrippetParameterSchema(rawValue);
+      continue;
+    }
+
+    if (!isMetadataPrimitive(rawValue)) continue;
+    const value = String(rawValue);
     if (normalized === "description") target.description = value;
     else if (normalized === "desc") target.desc = value;
     else if (normalized === "name") target.name = value;
