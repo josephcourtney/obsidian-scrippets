@@ -9,11 +9,14 @@ All notable changes to this project will be documented in this file. Dates use t
 - Add optional `css-var` bindings so parameter values can configure dependent CSS snippets through custom properties.
 - Add slider controls for bounded numeric parameters with precise numeric inputs and `control: auto|slider|number` schema selection.
 - Add automatic CSS custom-property names with `css-var: true`, using `--scrippets-<scrippet-id>-<parameter-key>` by default.
+- Add `@scrippets-setting` annotations in CSS snippets so custom-property defaults, units, bounds, and controls can be declared beside the styles that use them.
+- Watch the CSS snippets folder for parameter metadata changes and optionally expose CSS-owned values to `invoke(plugin, settings)` with a `key` annotation.
 
 ### Changed
 - Extend the nowrap example with configurable cursor margin, fade width, and scrollbar clearance plus a matching CSS snippet example.
 - Prefer block-comment `@settings` metadata in JavaScript examples so scrippet files remain valid JavaScript for external tooling.
 - Show parameter defaults, resolved CSS custom-property names, and per-parameter reset actions in the settings panel.
+- Move the nowrap fade and scrollbar settings into `nowrap.css`; resetting CSS-owned parameters now removes the inline override so the CSS declaration remains the source of the default.
 
 ### Fixed
 - Mask YAML frontmatter before JavaScript evaluation so frontmatter-based scrippets remain executable while preserving source line layout.
@@ -75,7 +78,7 @@ All notable changes to this project will be documented in this file. Dates use t
 
 ## [1.1.1] - 2025-09-23
 ### Added
-- Add metadata-first scanning with header previews, first-run context, and accessible modals.
+- Document metadata-first scanning with header previews and accessible first-run modals introduced after 1.1.1.
 - Add settings controls to open scrippet files and copy their vault-relative paths.
 
 ### Changed
