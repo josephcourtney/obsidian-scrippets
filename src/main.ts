@@ -1,4 +1,5 @@
 import { Notice, Plugin, normalizePath } from "obsidian";
+import { CssSnippetParameterCatalog } from "./css-snippet-parameters";
 import { ScrippetParameterCssRegistry } from "./parameter-css";
 import { ScrippetManager } from "./scrippet-manager";
 import { DEFAULT_SETTINGS, type ScrippetPluginSettings } from "./types";
@@ -8,6 +9,7 @@ export default class ScrippetPlugin extends Plugin {
   settings: ScrippetPluginSettings = DEFAULT_SETTINGS;
   manager!: ScrippetManager;
   readonly parameterCss = new ScrippetParameterCssRegistry();
+  readonly snippetParameters = new CssSnippetParameterCatalog();
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -21,6 +23,7 @@ export default class ScrippetPlugin extends Plugin {
 
   onunload(): void {
     this.parameterCss.clear();
+    this.snippetParameters.destroy();
     this.manager?.destroy();
   }
 
@@ -42,6 +45,7 @@ export default class ScrippetPlugin extends Plugin {
   private async initializeManager(): Promise<void> {
     try {
       await this.manager.initialize();
+      await this.snippetParameters.initialize(this);
       if (this.settings.runStartupOnLoad) {
         await this.manager.runStartupScripts();
       }
