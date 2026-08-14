@@ -1,39 +1,43 @@
----
-name: Toggle Wrap
-id: toggle-wrap
-description: Toggle editor line wrapping
-requires-snippet: nowrap
-settings:
-  cursor-margin:
-    type: number
-    label: Cursor scroll margin
-    description: Start horizontal scrolling before the caret reaches the right edge.
-    default: 48
-    min: 0
-    max: 200
-    step: 1
-    unit: px
-  fade-width:
-    type: number
-    label: Edge fade width
-    description: Width of the continuation fade at the right edge.
-    default: 32
-    min: 0
-    max: 100
-    step: 1
-    unit: px
-    css-var: --scrippets-nowrap-fade-width
-  scrollbar-offset:
-    type: number
-    label: Scrollbar clearance
-    description: Keep the fade clear of the vertical scrollbar.
-    default: 12
-    min: 0
-    max: 40
-    step: 1
-    unit: px
-    css-var: --scrippets-nowrap-scrollbar-offset
----
+/*
+@name: Toggle Wrap
+@id: toggle-wrap
+@desc: Toggle editor line wrapping
+@requires-snippet: nowrap
+@settings: {
+  "cursor-margin": {
+    "type": "number",
+    "label": "Cursor scroll margin",
+    "description": "Start horizontal scrolling before the caret reaches the right edge.",
+    "default": 48,
+    "min": 0,
+    "max": 200,
+    "step": 1,
+    "unit": "px"
+  },
+  "fade-width": {
+    "type": "number",
+    "label": "Edge fade width",
+    "description": "Width of the continuation fade at the right edge.",
+    "default": 32,
+    "min": 0,
+    "max": 100,
+    "step": 1,
+    "unit": "px",
+    "css-var": "--scrippets-nowrap-fade-width"
+  },
+  "scrollbar-offset": {
+    "type": "number",
+    "label": "Scrollbar clearance",
+    "description": "Keep the fade clear of the vertical scrollbar.",
+    "default": 12,
+    "min": 0,
+    "max": 40,
+    "step": 1,
+    "unit": "px",
+    "css-var": "--scrippets-nowrap-scrollbar-offset"
+  }
+}
+*/
 class ToggleLineWrap {
   async invoke(plugin, settings) {
     const app = plugin.app;
