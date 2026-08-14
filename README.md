@@ -10,7 +10,8 @@ Obsidian Scrippets lets you author small JavaScript “scrippets” right inside
 - Per-scrippet enable/disable switches, first-run confirmation, manual run buttons, and persisted parameter values.
 - Typed parameter controls for booleans, numbers, strings, and select menus in the Scrippets settings panel.
 - Bounded numeric parameters use a slider plus precise number input by default, with schema overrides for slider-only intent or number-input intent.
-- Optional CSS custom-property bindings with automatic `--scrippets-<id>-<parameter>` names so parameters can configure dependent CSS snippets without rewriting snippet files.
+- Required CSS snippets can declare their own configurable custom properties directly in the `.css` file, keeping CSS defaults, units, and controls beside the styles that consume them.
+- JavaScript parameters can still bind to CSS custom properties with automatic `--scrippets-<id>-<parameter>` names when that ownership model is useful.
 - Startup folder support with explicit opt-in, per-file toggles, and one-time approval for untrusted startup scrippets.
 - Per-scrippet overlap protection while an invocation is still running.
 - A bounded, session-local recent execution log with duration and failure details.
@@ -61,7 +62,7 @@ An optional block comment at the top of the file can provide directives:
 - `@id` – stable identifier; otherwise derived from the filename
 - `@desc` – short description shown in settings
 - `@requires-snippet` – CSS snippet id that must exist in `<vault config dir>/snippets/` before the scrippet can run; use the snippet filename with or without the `.css` extension
-- `@settings` – JSON or YAML mapping describing configurable parameters
+- `@settings` – JSON or YAML mapping describing configurable JavaScript parameters
 
 A required snippet only needs to exist. Its enabled/disabled state remains under the scrippet's control, which allows commands such as Toggle Wrap to enable and disable their own snippet. Missing dependencies fail through the normal execution error path and are included in recent execution history.
 
@@ -69,7 +70,7 @@ The same metadata can also be supplied through YAML frontmatter. Scrippets masks
 
 ### Configurable parameters
 
-Structured parameters can be declared with `@settings` inside the metadata comment. Keeping the schema inside a comment means the file remains valid JavaScript. Parameter values are stored by scrippet ID and passed as the second argument to `invoke`.
+Structured JavaScript parameters can be declared with `@settings` inside the metadata comment. Keeping the schema inside a comment means the file remains valid JavaScript. Parameter values are stored by scrippet ID and passed as the second argument to `invoke`.
 
 ```js
 /*
@@ -89,9 +90,7 @@ Structured parameters can be declared with `@settings` inside the metadata comme
     "min": 0,
     "max": 100,
     "step": 1,
-    "unit": "px",
-    "control": "slider",
-    "css-var": true
+    "unit": "px"
   },
   "message": {
     "type": "string",
@@ -120,45 +119,59 @@ Supported parameter types are `boolean`, `number`, `string`, and `select`. Numbe
 
 Structured `settings` metadata is also accepted through YAML frontmatter for compatibility, but comment metadata is recommended when the scrippet should remain standalone-valid JavaScript.
 
-The settings panel shows a **Scrippet parameters** section for every loaded scrippet that declares parameters. Each parameter shows its default value, CSS custom-property name when applicable, and an individual reset action. A **Reset all** button removes every saved override for that scrippet.
+The settings panel shows a **Scrippet parameters** section for every loaded scrippet that declares parameters itself or requires a CSS snippet that declares parameters. Each parameter shows its default value, CSS custom-property name when applicable, source file for CSS-owned parameters, and an individual reset action. A **Reset all** button removes every saved override for that scrippet.
 
 ### Configuring CSS snippets with parameters
 
-A parameter can optionally bind to a CSS custom property with `css-var`. Set `"css-var": true` to have Scrippets construct the name automatically as `--scrippets-<scrippet-id>-<parameter-key>`. The stable scrippet ID and parameter key determine the generated name, so changing a display label does not change the CSS API.
+CSS-facing parameters can be declared where the custom property is defined. When a scrippet uses `@requires-snippet: nowrap`, Scrippets scans `<vault config dir>/snippets/nowrap.css` for `@scrippets-setting` comments immediately followed by a `--scrippets-*` custom-property declaration.
 
-For example, with `@id: toggle-wrap`:
+```css
+:root {
+  /*
+   * @scrippets-setting
+   * label: Edge fade width
+   * description: Width of the continuation fade at the right edge.
+   * min: 0px
+   * max: 100px
+   * step: 1px
+   * control: slider
+   */
+  --scrippets-nowrap-fade-width: 32px;
 
-```json
-{
-  "fade-width": {
-    "type": "number",
-    "label": "Edge fade width",
-    "default": 32,
-    "min": 0,
-    "max": 100,
-    "unit": "px",
-    "css-var": true
-  }
+  /*
+   * @scrippets-setting
+   * label: Scrollbar clearance
+   * min: 0px
+   * max: 40px
+   * step: 1px
+   */
+  --scrippets-nowrap-scrollbar-offset: 12px;
 }
 ```
 
-Scrippets exposes:
+The custom-property declaration is the source of the default value and unit. A value such as `32px` is inferred as a numeric parameter with default `32` and unit `px`; non-numeric declarations are exposed as string parameters. `min`, `max`, and `step` may include the same unit as the declaration or omit the unit. `control` accepts `auto`, `slider`, or `number`; bounded numeric values use a slider plus exact number input by default.
+
+`label` and `description` are optional. If `label` is omitted, Scrippets derives it from the variable name. For a snippet named `nowrap.css`, `--scrippets-nowrap-fade-width` becomes the setting key `fade-width` and label `Fade Width`.
+
+By default a CSS-owned parameter is only used to update the custom property. Add `key` when JavaScript should receive the same value through `invoke(plugin, settings)`:
 
 ```css
---scrippets-toggle-wrap-fade-width: 32px;
+/*
+ * @scrippets-setting
+ * key: fade-width
+ * min: 0px
+ * max: 100px
+ */
+--scrippets-nowrap-edge-width: 32px;
 ```
 
-The dependent CSS snippet can use a fallback normally:
+The scrippet can then read `settings["fade-width"]`. Without `key`, the setting remains CSS-only.
 
-```css
-.cm-editor::after {
-  width: var(--scrippets-toggle-wrap-fade-width, 32px);
-}
-```
+Saved CSS overrides are applied as inline custom properties so changes are visible immediately. Resetting a CSS-owned parameter removes the inline override instead of writing the default value; the declaration in the CSS snippet naturally becomes active again. This means changing `--scrippets-nowrap-fade-width: 32px` to `40px` changes the default in one place. Scrippets watches the snippets folder and refreshes the settings panel when annotated snippet files change.
 
-If a different stable property name is needed, `css-var` may instead be an explicit `--scrippets-*` string. Omitting `css-var` (or setting it to `false`) keeps the parameter JavaScript-only. For CSS-bound number parameters, `unit` is appended to the custom-property value. Boolean values are exposed as `1` or `0`; string and select values are passed through as text. When more than one loaded scrippet binds the same CSS variable, the scrippet with the later ID in lexical order wins.
+JavaScript-owned parameters may still use `"css-var": true` to construct `--scrippets-<scrippet-id>-<parameter-key>` automatically, or provide an explicit `--scrippets-*` string. This remains useful when the JavaScript behavior is the natural owner of a setting. For purely visual values, CSS-owned declarations are recommended.
 
-See `examples/toggle_nowrap.js` and `examples/nowrap.css` for a complete scrippet + snippet pair that exposes cursor margin, edge fade width, and scrollbar clearance through the settings panel.
+See `examples/toggle_nowrap.js` and `examples/nowrap.css` for a complete pair: cursor margin remains JavaScript-owned, while edge fade width and scrollbar clearance are declared in `nowrap.css`.
 
 ### Startup scripts
 
@@ -171,7 +184,7 @@ Open **Settings → Community plugins → Scrippets** to:
 - Change the scrippet folder.
 - Toggle startup execution, confirm-first-run, and review safety warnings.
 - Inspect loaded commands, enable/disable them, and run them manually.
-- Configure parameters declared by scrippets with sliders, precise inputs, generated CSS-variable details, and reset actions.
+- Configure JavaScript and CSS-snippet parameters with sliders, precise inputs, source/default details, and reset actions.
 - View load errors or skipped files (e.g., duplicate IDs).
 - Add new files via the **+** dialog, including templates for the supported export shapes.
 - See whether a scrippet is currently running.
@@ -210,7 +223,7 @@ See [CHANGELOG.md](./CHANGELOG.md) for a human-readable history of updates.
 1. Confirm the working tree is clean and the GitHub CLI (`gh`) is authenticated (`gh auth login`).
 2. Run `npm run release -- --type=patch` (default) or `--type=minor` / `--type=major` depending on the bump you need.
    - To specify an exact version instead, use `npm run release -- --version=1.2.3`.
-3. The release script will build the bundle, run `npm version`, push the branch and tags, and create the GitHub release using the notes from `CHANGELOG.md`.
+3. The release script will build the bundle, run `npm version`, push the branch and tags, and create a GitHub release using the notes from `CHANGELOG.md`.
    - Add `--no-push` to skip pushing, or `--no-publish` to skip the GitHub release step.
 
 ## Project structure
@@ -222,6 +235,7 @@ obsidian-scrippets/
 │   ├── scrippet-manager.ts
 │   ├── metadata.ts
 │   ├── parameters.ts
+│   ├── css-snippet-parameters.ts
 │   └── ui/             # Settings UI and modals
 ├── examples/
 ├── esbuild.config.mjs
@@ -230,7 +244,7 @@ obsidian-scrippets/
 ├── versions.json
 ├── styles.css
 ├── scripts/
-│   └── release.mjs    # release automation script
+│   └── release.mjs    # release automation
 └── package.json
 ```
 
