@@ -5,14 +5,16 @@ All notable changes to this project will be documented in this file. Dates use t
 ## [Unreleased]
 ### Added
 - Add `@requires-snippet` metadata so scrippets can declare CSS snippet file dependencies that are checked before invocation.
-- Add typed per-scrippet parameters declared through YAML frontmatter, persisted by scrippet ID, rendered in the settings panel, and passed to `invoke(plugin, settings)`.
+- Add typed per-scrippet parameters declared through `@settings` comment metadata or YAML frontmatter, persisted by scrippet ID, rendered in the settings panel, and passed to `invoke(plugin, settings)`.
 - Add optional `css-var` bindings so parameter values can configure dependent CSS snippets through custom properties.
 
 ### Changed
 - Extend the nowrap example with configurable cursor margin, fade width, and scrollbar clearance plus a matching CSS snippet example.
+- Prefer block-comment `@settings` metadata in JavaScript examples so scrippet files remain valid JavaScript for external tooling.
 
 ### Fixed
 - Mask YAML frontmatter before JavaScript evaluation so frontmatter-based scrippets remain executable while preserving source line layout.
+- Parse structured `@settings` mappings from metadata comments and normalize conventional leading `*` comment prefixes.
 
 ## [1.5.0] - 2026-08-03
 ### Added
@@ -31,7 +33,7 @@ All notable changes to this project will be documented in this file. Dates use t
 ## [1.4.1] - 2026-08-03
 ### Fixed
 - Require a one-time per-scrippet approval before an untrusted startup scrippet can run automatically.
-- Keep startup approval separate from normal first-run history so a previously run command is not implicitly approved for unattended startup.
+- Keep startup approval separate from normal first-run history so a previously run command is not implicitly approved for unattended startup execution.
 
 ### Changed
 - Clarify startup, trusted-folder, and first-run confirmation messaging around the new approval behavior.

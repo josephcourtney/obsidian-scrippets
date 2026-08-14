@@ -54,51 +54,58 @@ module.exports = { invoke };
 
 ### Metadata directives
 
-An optional block comment at the top of the file can provide simple directives:
+An optional block comment at the top of the file can provide directives:
 
 - `@name` – display name in settings and the command palette
 - `@id` – stable identifier; otherwise derived from the filename
 - `@desc` – short description shown in settings
 - `@requires-snippet` – CSS snippet id that must exist in `<vault config dir>/snippets/` before the scrippet can run; use the snippet filename with or without the `.css` extension
+- `@settings` – JSON or YAML mapping describing configurable parameters
 
 A required snippet only needs to exist. Its enabled/disabled state remains under the scrippet's control, which allows commands such as Toggle Wrap to enable and disable their own snippet. Missing dependencies fail through the normal execution error path and are included in recent execution history.
 
-The same metadata can be supplied through YAML frontmatter. Scrippets removes YAML frontmatter before evaluating the JavaScript while preserving its line layout for useful stack traces.
+The same metadata can also be supplied through YAML frontmatter. Scrippets masks YAML frontmatter before evaluating the JavaScript while preserving its line layout for useful stack traces. For `.js` files that should remain valid JavaScript for linters, formatters, and editors, prefer block-comment metadata.
 
 ### Configurable parameters
 
-Structured parameters are declared through YAML frontmatter under `settings`. Parameter values are stored by scrippet ID and passed as the second argument to `invoke`.
+Structured parameters can be declared with `@settings` inside the metadata comment. Keeping the schema inside a comment means the file remains valid JavaScript. Parameter values are stored by scrippet ID and passed as the second argument to `invoke`.
 
 ```js
----
-name: Example
-id: parameter-example
-settings:
-  enabled:
-    type: boolean
-    label: Enabled
-    default: true
-  margin:
-    type: number
-    label: Margin
-    description: Space around the feature.
-    default: 32
-    min: 0
-    max: 100
-    step: 1
-    unit: px
-  message:
-    type: string
-    label: Message
-    default: Hello
-  mode:
-    type: select
-    label: Mode
-    options:
-      compact: Compact
-      comfortable: Comfortable
-    default: comfortable
----
+/*
+@name: Example
+@id: parameter-example
+@settings: {
+  "enabled": {
+    "type": "boolean",
+    "label": "Enabled",
+    "default": true
+  },
+  "margin": {
+    "type": "number",
+    "label": "Margin",
+    "description": "Space around the feature.",
+    "default": 32,
+    "min": 0,
+    "max": 100,
+    "step": 1,
+    "unit": "px"
+  },
+  "message": {
+    "type": "string",
+    "label": "Message",
+    "default": "Hello"
+  },
+  "mode": {
+    "type": "select",
+    "label": "Mode",
+    "options": {
+      "compact": "Compact",
+      "comfortable": "Comfortable"
+    },
+    "default": "comfortable"
+  }
+}
+*/
 class Scrippet {
   async invoke(plugin, settings) {
     new Notice(`${settings.message} — ${settings.mode}`);
@@ -106,7 +113,9 @@ class Scrippet {
 }
 ```
 
-Supported parameter types are `boolean`, `number`, `string`, and `select`. Number parameters may define `min`, `max`, `step`, and `unit`. Select options may be a YAML mapping as above or a list of strings / `{ value, label }` mappings. Saved values that no longer match the schema fall back to the declared default.
+Supported parameter types are `boolean`, `number`, `string`, and `select`. Number parameters may define `min`, `max`, `step`, and `unit`. Select options may be a mapping as above or a list of strings / `{ value, label }` mappings. Saved values that no longer match the schema fall back to the declared default.
+
+Structured `settings` metadata is also accepted through YAML frontmatter for compatibility, but comment metadata is recommended when the scrippet should remain standalone-valid JavaScript.
 
 The settings panel shows a **Scrippet parameters** section for every loaded scrippet that declares parameters. A **Reset** button removes saved overrides and returns that scrippet to its defaults.
 
@@ -114,16 +123,20 @@ The settings panel shows a **Scrippet parameters** section for every loaded scri
 
 A parameter can optionally bind to a CSS custom property with `css-var`. For safety, bound custom-property names must start with `--scrippets-`. Scrippets keeps the property in sync with the saved parameter value and restores the previous inline value when the plugin unloads or the binding disappears.
 
-```yaml
-settings:
-  fade-width:
-    type: number
-    label: Edge fade width
-    default: 32
-    min: 0
-    max: 100
-    unit: px
-    css-var: --scrippets-nowrap-fade-width
+For example, an `@settings` mapping can include:
+
+```json
+{
+  "fade-width": {
+    "type": "number",
+    "label": "Edge fade width",
+    "default": 32,
+    "min": 0,
+    "max": 100,
+    "unit": "px",
+    "css-var": "--scrippets-nowrap-fade-width"
+  }
+}
 ```
 
 The dependent CSS snippet can then use a fallback normally:
@@ -188,7 +201,7 @@ See [CHANGELOG.md](./CHANGELOG.md) for a human-readable history of updates.
 1. Confirm the working tree is clean and the GitHub CLI (`gh`) is authenticated (`gh auth login`).
 2. Run `npm run release -- --type=patch` (default) or `--type=minor` / `--type=major` depending on the bump you need.
    - To specify an exact version instead, use `npm run release -- --version=1.2.3`.
-3. The release script will build the bundle, run `npm version`, push the branch and tags, and create a GitHub release using the notes from `CHANGELOG.md`.
+3. The release script will build the bundle, run `npm version`, push the branch and tags, and create the GitHub release using the notes from `CHANGELOG.md`.
    - Add `--no-push` to skip pushing, or `--no-publish` to skip the GitHub release step.
 
 ## Project structure
