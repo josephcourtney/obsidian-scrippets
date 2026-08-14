@@ -1,6 +1,7 @@
 import type { Plugin } from "obsidian";
 
 export type ScrippetParameterType = "boolean" | "number" | "string" | "select";
+export type ScrippetParameterControl = "auto" | "slider" | "number";
 export type ScrippetParameterValue = boolean | number | string;
 
 export interface ScrippetParameterOption {
@@ -17,8 +18,9 @@ export interface ScrippetParameterDefinition {
   max?: number;
   step?: number;
   unit?: string;
+  control?: ScrippetParameterControl;
   options?: ScrippetParameterOption[];
-  cssVar?: string;
+  cssVar?: true | string;
 }
 
 export type ScrippetParameterSchema = Record<string, ScrippetParameterDefinition>;
