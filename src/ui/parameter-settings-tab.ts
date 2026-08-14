@@ -15,6 +15,7 @@ import { ScrippetSettingTab } from "./settings-tab";
 
 export class ParameterizedScrippetSettingTab extends ScrippetSettingTab {
   private readonly scrippetPlugin: ScrippetPlugin;
+  private settingsSaveQueue: Promise<void> = Promise.resolve();
 
   constructor(app: App, plugin: ScrippetPlugin) {
     super(app, plugin);
@@ -67,7 +68,7 @@ export class ParameterizedScrippetSettingTab extends ScrippetSettingTab {
           .setTooltip("Reset all parameters to their defaults")
           .onClick(async () => {
             delete this.scrippetPlugin.settings.scrippetSettings[descriptor.id];
-            await this.scrippetPlugin.saveSettings();
+            await this.queueSettingsSave();
             this.syncParameterCss();
             this.redisplayPreservingScroll();
           }),
@@ -243,7 +244,7 @@ export class ParameterizedScrippetSettingTab extends ScrippetSettingTab {
 
     try {
       this.syncParameterCss();
-      await this.scrippetPlugin.saveSettings();
+      await this.queueSettingsSave();
     } catch (error) {
       console.error("Scrippets: failed to save parameter value", error);
       new Notice("Failed to save scrippet parameter.");
@@ -263,9 +264,15 @@ export class ParameterizedScrippetSettingTab extends ScrippetSettingTab {
       this.scrippetPlugin.settings.scrippetSettings[descriptor.id] = next;
     }
 
-    await this.scrippetPlugin.saveSettings();
+    await this.queueSettingsSave();
     this.syncParameterCss();
     this.redisplayPreservingScroll();
+  }
+
+  private queueSettingsSave(): Promise<void> {
+    const next = this.settingsSaveQueue.then(() => this.scrippetPlugin.saveSettings());
+    this.settingsSaveQueue = next.catch(() => undefined);
+    return next;
   }
 
   private getParameterizedDescriptors(): ScrippetDescriptor[] {
