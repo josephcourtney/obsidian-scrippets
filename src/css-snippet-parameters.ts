@@ -5,14 +5,13 @@ import {
 } from "./parameters";
 import { SerialTaskQueue } from "./serial-task-queue";
 import type {
-  CssSnippetParameterDefinition,
   CssSnippetParameterSchema,
   CssSnippetParameterSource,
   ScrippetParameterValues,
 } from "./types";
 
 const ANNOTATED_CUSTOM_PROPERTY =
-  /\/\*([\s\S]*?@scrippets-setting[\s\S]*?)\*\/\s*(--[A-Za-z0-9_-]+)\s*:\s*([^;{}]+);/g;
+  /\/\*((?:(?!\*\/)[\s\S])*?@scrippets-setting(?:(?!\*\/)[\s\S])*?)\*\/\s*(--[A-Za-z0-9_-]+)\s*:\s*([^;{}]+);/g;
 const CSS_CUSTOM_PROPERTY = /^--scrippets-[A-Za-z0-9_-]+$/;
 const CSS_NUMBER = /^([+-]?(?:\d+(?:\.\d*)?|\.\d+))([A-Za-z%][A-Za-z0-9%_-]*)?$/;
 const ANNOTATION_FIELDS = new Set([
@@ -341,9 +340,6 @@ function parseBound(raw: string, expectedUnit: string, path: string): number {
     throw new Error(
       `CSS snippet setting "${path}" uses unit "${parsed.unit}" but the custom property uses "${expectedUnit || "no unit"}".`,
     );
-  }
-  if (!expectedUnit && parsed.unit) {
-    throw new Error(`CSS snippet setting "${path}" cannot add a unit to a unitless default.`);
   }
   return parsed.value;
 }
