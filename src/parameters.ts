@@ -7,7 +7,7 @@ import type {
   ScrippetParameterValues,
 } from "./types";
 
-const CSS_CUSTOM_PROPERTY = /^--[A-Za-z0-9_-]+$/;
+const CSS_CUSTOM_PROPERTY = /^--scrippets-[A-Za-z0-9_-]+$/;
 const PARAMETER_TYPES = new Set<ScrippetParameterType>(["boolean", "number", "string", "select"]);
 
 export function parseScrippetParameterSchema(raw: unknown): ScrippetParameterSchema | undefined {
@@ -91,7 +91,7 @@ function parseDefinition(key: string, raw: unknown): ScrippetParameterDefinition
 
   if (cssVar && !CSS_CUSTOM_PROPERTY.test(cssVar)) {
     throw new Error(
-      `Scrippet setting "${key}" has invalid css-var "${cssVar}". CSS custom properties must start with --.`,
+      `Scrippet setting "${key}" has invalid css-var "${cssVar}". CSS custom properties must start with --scrippets-.`,
     );
   }
 
