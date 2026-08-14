@@ -9,7 +9,8 @@ Obsidian Scrippets lets you author small JavaScript “scrippets” right inside
 - Metadata from header comments or YAML frontmatter for stable IDs, names, descriptions, CSS snippet dependencies, and configurable parameters.
 - Per-scrippet enable/disable switches, first-run confirmation, manual run buttons, and persisted parameter values.
 - Typed parameter controls for booleans, numbers, strings, and select menus in the Scrippets settings panel.
-- Optional CSS custom-property bindings so parameters can configure dependent CSS snippets without rewriting snippet files.
+- Bounded numeric parameters use a slider plus precise number input by default, with schema overrides for slider-only intent or number-input intent.
+- Optional CSS custom-property bindings with automatic `--scrippets-<id>-<parameter>` names so parameters can configure dependent CSS snippets without rewriting snippet files.
 - Startup folder support with explicit opt-in, per-file toggles, and one-time approval for untrusted startup scrippets.
 - Per-scrippet overlap protection while an invocation is still running.
 - A bounded, session-local recent execution log with duration and failure details.
@@ -88,7 +89,9 @@ Structured parameters can be declared with `@settings` inside the metadata comme
     "min": 0,
     "max": 100,
     "step": 1,
-    "unit": "px"
+    "unit": "px",
+    "control": "slider",
+    "css-var": true
   },
   "message": {
     "type": "string",
@@ -113,17 +116,17 @@ class Scrippet {
 }
 ```
 
-Supported parameter types are `boolean`, `number`, `string`, and `select`. Number parameters may define `min`, `max`, `step`, and `unit`. Select options may be a mapping as above or a list of strings / `{ value, label }` mappings. Saved values that no longer match the schema fall back to the declared default.
+Supported parameter types are `boolean`, `number`, `string`, and `select`. Number parameters may define `min`, `max`, `step`, and `unit`. Bounded numbers with both `min` and `max` render as a slider plus a numeric input by default. Set `control` to `number` to suppress the slider, or `slider` to require a slider; explicit sliders must declare a usable `min` and `max`. `control: auto` is the default. Select options may be a mapping as above or a list of strings / `{ value, label }` mappings. Saved values that no longer match the schema fall back to the declared default.
 
 Structured `settings` metadata is also accepted through YAML frontmatter for compatibility, but comment metadata is recommended when the scrippet should remain standalone-valid JavaScript.
 
-The settings panel shows a **Scrippet parameters** section for every loaded scrippet that declares parameters. A **Reset** button removes saved overrides and returns that scrippet to its defaults.
+The settings panel shows a **Scrippet parameters** section for every loaded scrippet that declares parameters. Each parameter shows its default value, CSS custom-property name when applicable, and an individual reset action. A **Reset all** button removes every saved override for that scrippet.
 
 ### Configuring CSS snippets with parameters
 
-A parameter can optionally bind to a CSS custom property with `css-var`. For safety, bound custom-property names must start with `--scrippets-`. Scrippets keeps the property in sync with the saved parameter value and restores the previous inline value when the plugin unloads or the binding disappears.
+A parameter can optionally bind to a CSS custom property with `css-var`. Set `"css-var": true` to have Scrippets construct the name automatically as `--scrippets-<scrippet-id>-<parameter-key>`. The stable scrippet ID and parameter key determine the generated name, so changing a display label does not change the CSS API.
 
-For example, an `@settings` mapping can include:
+For example, with `@id: toggle-wrap`:
 
 ```json
 {
@@ -134,20 +137,26 @@ For example, an `@settings` mapping can include:
     "min": 0,
     "max": 100,
     "unit": "px",
-    "css-var": "--scrippets-nowrap-fade-width"
+    "css-var": true
   }
 }
 ```
 
-The dependent CSS snippet can then use a fallback normally:
+Scrippets exposes:
+
+```css
+--scrippets-toggle-wrap-fade-width: 32px;
+```
+
+The dependent CSS snippet can use a fallback normally:
 
 ```css
 .cm-editor::after {
-  width: var(--scrippets-nowrap-fade-width, 32px);
+  width: var(--scrippets-toggle-wrap-fade-width, 32px);
 }
 ```
 
-For CSS-bound number parameters, `unit` is appended to the custom-property value. Boolean values are exposed as `1` or `0`; string and select values are passed through as text. When more than one loaded scrippet binds the same CSS variable, the scrippet with the later ID in lexical order wins. The `--scrippets-` prefix is required, and names such as `--scrippets-<id>-...` are recommended to avoid collisions.
+If a different stable property name is needed, `css-var` may instead be an explicit `--scrippets-*` string. Omitting `css-var` (or setting it to `false`) keeps the parameter JavaScript-only. For CSS-bound number parameters, `unit` is appended to the custom-property value. Boolean values are exposed as `1` or `0`; string and select values are passed through as text. When more than one loaded scrippet binds the same CSS variable, the scrippet with the later ID in lexical order wins.
 
 See `examples/toggle_nowrap.js` and `examples/nowrap.css` for a complete scrippet + snippet pair that exposes cursor margin, edge fade width, and scrollbar clearance through the settings panel.
 
@@ -162,7 +171,7 @@ Open **Settings → Community plugins → Scrippets** to:
 - Change the scrippet folder.
 - Toggle startup execution, confirm-first-run, and review safety warnings.
 - Inspect loaded commands, enable/disable them, and run them manually.
-- Configure parameters declared by scrippets and reset saved overrides.
+- Configure parameters declared by scrippets with sliders, precise inputs, generated CSS-variable details, and reset actions.
 - View load errors or skipped files (e.g., duplicate IDs).
 - Add new files via the **+** dialog, including templates for the supported export shapes.
 - See whether a scrippet is currently running.

@@ -12,7 +12,7 @@
 
 /* Leave enough room to scroll the end of a long line clear of the fade. */
 .markdown-source-view.mod-cm6 .cm-content {
-  padding-right: var(--scrippets-nowrap-fade-width, 32px) !important;
+  padding-right: var(--scrippets-toggle-wrap-fade-width, 32px) !important;
 }
 
 .markdown-source-view.mod-cm6 .cm-editor {
@@ -24,9 +24,9 @@
   content: "";
   position: absolute;
   top: 0;
-  right: var(--scrippets-nowrap-scrollbar-offset, 12px);
+  right: var(--scrippets-toggle-wrap-scrollbar-offset, 12px);
   bottom: 0;
-  width: var(--scrippets-nowrap-fade-width, 32px);
+  width: var(--scrippets-toggle-wrap-fade-width, 32px);
   background: linear-gradient(to right, transparent, var(--background-primary));
   pointer-events: none;
   z-index: 10;

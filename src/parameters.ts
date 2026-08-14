@@ -1,4 +1,5 @@
 import type {
+  ScrippetParameterControl,
   ScrippetParameterDefinition,
   ScrippetParameterOption,
   ScrippetParameterSchema,
@@ -9,11 +10,12 @@ import type {
 
 const CSS_CUSTOM_PROPERTY = /^--scrippets-[A-Za-z0-9_-]+$/;
 const PARAMETER_TYPES = new Set<ScrippetParameterType>(["boolean", "number", "string", "select"]);
+const PARAMETER_CONTROLS = new Set<ScrippetParameterControl>(["auto", "slider", "number"]);
 
 export function parseScrippetParameterSchema(raw: unknown): ScrippetParameterSchema | undefined {
   if (raw == null) return undefined;
   if (!isRecord(raw)) {
-    throw new Error('Metadata "settings" must be a YAML mapping.');
+    throw new Error('Metadata "settings" must be a mapping/object.');
   }
 
   const schema: ScrippetParameterSchema = {};
@@ -79,21 +81,44 @@ export function formatScrippetParameterCssValue(
   return String(value);
 }
 
+export function resolveScrippetParameterCssVarName(
+  scrippetId: string,
+  key: string,
+  definition: ScrippetParameterDefinition,
+): string | undefined {
+  if (!definition.cssVar) return undefined;
+  if (definition.cssVar !== true) return definition.cssVar;
+
+  const idPart = toCssNamePart(scrippetId);
+  const keyPart = toCssNamePart(key);
+  if (!idPart || !keyPart) return undefined;
+  return `--scrippets-${idPart}-${keyPart}`;
+}
+
+export function shouldUseScrippetParameterSlider(
+  definition: ScrippetParameterDefinition,
+): boolean {
+  if (definition.type !== "number" || definition.control === "number") return false;
+  const bounded =
+    definition.min != null &&
+    definition.max != null &&
+    Number.isFinite(definition.min) &&
+    Number.isFinite(definition.max) &&
+    definition.max > definition.min;
+  if (!bounded) return false;
+  return definition.control === "slider" || definition.control == null || definition.control === "auto";
+}
+
 function parseDefinition(key: string, raw: unknown): ScrippetParameterDefinition {
   if (!isRecord(raw)) {
-    throw new Error(`Scrippet setting "${key}" must be a YAML mapping.`);
+    throw new Error(`Scrippet setting "${key}" must be a mapping/object.`);
   }
 
   const type = parseType(key, raw.type);
   const label = readOptionalString(raw.label) ?? humanize(key);
   const description = readOptionalString(raw.description) ?? readOptionalString(raw.desc);
-  const cssVar = readOptionalString(raw["css-var"]) ?? readOptionalString(raw.cssVar);
-
-  if (cssVar && !CSS_CUSTOM_PROPERTY.test(cssVar)) {
-    throw new Error(
-      `Scrippet setting "${key}" has invalid css-var "${cssVar}". CSS custom properties must start with --scrippets-.`,
-    );
-  }
+  const cssVar = parseCssVar(key, raw["css-var"] ?? raw.cssVar);
+  const control = parseControl(key, type, raw.control);
 
   const base: Omit<ScrippetParameterDefinition, "default"> = {
     type,
@@ -114,10 +139,16 @@ function parseDefinition(key: string, raw: unknown): ScrippetParameterDefinition
     if (step != null && step <= 0) {
       throw new Error(`Scrippet setting "${key}" must use a positive step.`);
     }
+    if (control === "slider" && (min == null || max == null || max <= min)) {
+      throw new Error(
+        `Scrippet setting "${key}" uses a slider and must declare min and max with max greater than min.`,
+      );
+    }
 
     const definition: ScrippetParameterDefinition = {
       ...base,
       type,
+      control,
       default: 0,
       ...(min != null ? { min } : {}),
       ...(max != null ? { max } : {}),
@@ -182,6 +213,46 @@ function parseType(key: string, raw: unknown): ScrippetParameterType {
     );
   }
   return raw as ScrippetParameterType;
+}
+
+function parseControl(
+  key: string,
+  type: ScrippetParameterType,
+  raw: unknown,
+): ScrippetParameterControl {
+  if (raw == null) return "auto";
+  if (type !== "number") {
+    throw new Error(`Scrippet setting "${key}" can only use control when type is number.`);
+  }
+  if (typeof raw !== "string" || !PARAMETER_CONTROLS.has(raw as ScrippetParameterControl)) {
+    throw new Error(`Scrippet setting "${key}" control must be auto, slider, or number.`);
+  }
+  return raw as ScrippetParameterControl;
+}
+
+function parseCssVar(key: string, raw: unknown): true | string | undefined {
+  if (raw == null || raw === false) return undefined;
+  if (raw === true) {
+    if (!toCssNamePart(key)) {
+      throw new Error(
+        `Scrippet setting "${key}" cannot construct an automatic css-var name from its key.`,
+      );
+    }
+    return true;
+  }
+  if (typeof raw !== "string") {
+    throw new Error(
+      `Scrippet setting "${key}" css-var must be true, false, or an explicit --scrippets-* custom property.`,
+    );
+  }
+
+  const value = raw.trim();
+  if (!CSS_CUSTOM_PROPERTY.test(value)) {
+    throw new Error(
+      `Scrippet setting "${key}" has invalid css-var "${value}". CSS custom properties must start with --scrippets-.`,
+    );
+  }
+  return value;
 }
 
 function parseOptions(key: string, raw: unknown): ScrippetParameterOption[] {
@@ -272,6 +343,14 @@ function humanize(value: string): string {
   return value
     .replace(/[-_]+/g, " ")
     .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function toCssNamePart(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
