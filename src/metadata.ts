@@ -129,7 +129,10 @@ function applyMetadataRecord(
     if (!normalized) continue;
 
     if (normalized === "settings") {
-      if (allowStructured) target.settings = parseScrippetParameterSchema(rawValue);
+      const structured = parseStructuredMetadataValue(rawValue, "settings", allowStructured);
+      if (structured !== undefined) {
+        target.settings = parseScrippetParameterSchema(structured);
+      }
       continue;
     }
 
@@ -143,9 +146,32 @@ function applyMetadataRecord(
   }
 }
 
+function parseStructuredMetadataValue(
+  rawValue: unknown,
+  key: string,
+  allowStructured: boolean,
+): unknown | undefined {
+  if (typeof rawValue === "string") {
+    try {
+      return parseYaml(rawValue) as unknown;
+    } catch (error) {
+      throw new Error(
+        `Metadata "@${key}" must contain a valid JSON or YAML mapping: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  return allowStructured ? rawValue : undefined;
+}
+
 function parseComment(block: string): Record<string, unknown> {
   const meta: Record<string, unknown> = {};
-  const body = block.replace(/^\/\*/, "").replace(/\*\/$/, "");
+  const body = block
+    .replace(/^\/\*/, "")
+    .replace(/\*\/$/, "")
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^\s*\*\s?/, ""))
+    .join("\n");
 
   let directive: RegExpExecArray | null;
   DIRECTIVE.lastIndex = 0;
