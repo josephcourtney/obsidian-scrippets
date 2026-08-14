@@ -6,8 +6,10 @@ Obsidian Scrippets lets you author small JavaScript “scrippets” right inside
 
 - Works on desktop and mobile using the Obsidian vault adapter (no `fs` dependency).
 - Configurable scrippet folder under the vault config directory with live reload on file create, modify, rename, or delete.
-- Automatic metadata parsing from header comments for stable IDs, names, descriptions, and CSS snippet dependencies.
-- Per-scrippet enable/disable switches, first-run confirmation, and manual run buttons.
+- Metadata from header comments or YAML frontmatter for stable IDs, names, descriptions, CSS snippet dependencies, and configurable parameters.
+- Per-scrippet enable/disable switches, first-run confirmation, manual run buttons, and persisted parameter values.
+- Typed parameter controls for booleans, numbers, strings, and select menus in the Scrippets settings panel.
+- Optional CSS custom-property bindings so parameters can configure dependent CSS snippets without rewriting snippet files.
 - Startup folder support with explicit opt-in, per-file toggles, and one-time approval for untrusted startup scrippets.
 - Per-scrippet overlap protection while an invocation is still running.
 - A bounded, session-local recent execution log with duration and failure details.
@@ -21,27 +23,22 @@ Scrippets execute with the same privileges as Obsidian. They can read, write, or
 
 Scrippets live in `/<vault>/<folder>/*.js`. By default, the folder is `<vault config dir>/scrippets/` (usually `.obsidian/scrippets/`). Startup scrippets go into the `startup/` sub-folder.
 
-Each file must expose an `invoke(plugin)` function. Three export shapes are supported:
+Each file must expose an `invoke(plugin)` or `invoke(plugin, settings)` function. Three export shapes are supported:
 
 ```js
-/* @name: Toggle Wrap @id: toggle-wrap @desc: Toggle the nowrap snippet @requires-snippet: nowrap */
+/* @name: Daily Notice @id: daily-notice */
 class Scrippet {
   async invoke(plugin) {
-    const { app } = plugin;
-    const snippets = app.customCss.enabledSnippets;
-    const enabled = snippets.has("nowrap");
-    app.customCss.setCssEnabledStatus("nowrap", !enabled);
+    new Notice("Remember to review your daily note!");
   }
 }
 ```
 
 ```js
-/* @name: Daily Notice @id: daily-notice */
-module.exports = class DailyNotice {
+/* @name: Exported Notice @id: exported-notice */
+module.exports = class ExportedNotice {
   async invoke(plugin) {
-    await plugin.app.workspace.onLayoutReady(() => {
-      new Notice("Remember to review your daily note!");
-    });
+    new Notice(`Running inside ${plugin.manifest.name}.`);
   }
 };
 ```
@@ -57,7 +54,7 @@ module.exports = { invoke };
 
 ### Metadata directives
 
-An optional block comment at the top of the file can provide directives. Recognised keys are:
+An optional block comment at the top of the file can provide simple directives:
 
 - `@name` – display name in settings and the command palette
 - `@id` – stable identifier; otherwise derived from the filename
@@ -66,7 +63,80 @@ An optional block comment at the top of the file can provide directives. Recogni
 
 A required snippet only needs to exist. Its enabled/disabled state remains under the scrippet's control, which allows commands such as Toggle Wrap to enable and disable their own snippet. Missing dependencies fail through the normal execution error path and are included in recent execution history.
 
-Additional directives are ignored but preserved in the source.
+The same metadata can be supplied through YAML frontmatter. Scrippets removes YAML frontmatter before evaluating the JavaScript while preserving its line layout for useful stack traces.
+
+### Configurable parameters
+
+Structured parameters are declared through YAML frontmatter under `settings`. Parameter values are stored by scrippet ID and passed as the second argument to `invoke`.
+
+```js
+---
+name: Example
+id: parameter-example
+settings:
+  enabled:
+    type: boolean
+    label: Enabled
+    default: true
+  margin:
+    type: number
+    label: Margin
+    description: Space around the feature.
+    default: 32
+    min: 0
+    max: 100
+    step: 1
+    unit: px
+  message:
+    type: string
+    label: Message
+    default: Hello
+  mode:
+    type: select
+    label: Mode
+    options:
+      compact: Compact
+      comfortable: Comfortable
+    default: comfortable
+---
+class Scrippet {
+  async invoke(plugin, settings) {
+    new Notice(`${settings.message} — ${settings.mode}`);
+  }
+}
+```
+
+Supported parameter types are `boolean`, `number`, `string`, and `select`. Number parameters may define `min`, `max`, `step`, and `unit`. Select options may be a YAML mapping as above or a list of strings / `{ value, label }` mappings. Saved values that no longer match the schema fall back to the declared default.
+
+The settings panel shows a **Scrippet parameters** section for every loaded scrippet that declares parameters. A **Reset** button removes saved overrides and returns that scrippet to its defaults.
+
+### Configuring CSS snippets with parameters
+
+A parameter can optionally bind to a CSS custom property with `css-var`. Scrippets keeps the property in sync with the saved parameter value and restores the previous inline value when the plugin unloads or the binding disappears.
+
+```yaml
+settings:
+  fade-width:
+    type: number
+    label: Edge fade width
+    default: 32
+    min: 0
+    max: 100
+    unit: px
+    css-var: --scrippets-nowrap-fade-width
+```
+
+The dependent CSS snippet can then use a fallback normally:
+
+```css
+.cm-editor::after {
+  width: var(--scrippets-nowrap-fade-width, 32px);
+}
+```
+
+For CSS-bound number parameters, `unit` is appended to the custom-property value. Boolean values are exposed as `1` or `0`; string and select values are passed through as text. When more than one loaded scrippet binds the same CSS variable, the scrippet with the later ID in lexical order wins, so unique names such as `--scrippets-<id>-...` are recommended.
+
+See `examples/toggle_nowrap.js` and `examples/nowrap.css` for a complete scrippet + snippet pair that exposes cursor margin, edge fade width, and scrollbar clearance through the settings panel.
 
 ### Startup scripts
 
@@ -79,6 +149,7 @@ Open **Settings → Community plugins → Scrippets** to:
 - Change the scrippet folder.
 - Toggle startup execution, confirm-first-run, and review safety warnings.
 - Inspect loaded commands, enable/disable them, and run them manually.
+- Configure parameters declared by scrippets and reset saved overrides.
 - View load errors or skipped files (e.g., duplicate IDs).
 - Add new files via the **+** dialog, including templates for the supported export shapes.
 - See whether a scrippet is currently running.
@@ -128,7 +199,9 @@ obsidian-scrippets/
 │   ├── main.ts         # Plugin entry
 │   ├── scrippet-manager.ts
 │   ├── metadata.ts
+│   ├── parameters.ts
 │   └── ui/             # Settings UI and modals
+├── examples/
 ├── esbuild.config.mjs
 ├── tsconfig.json
 ├── manifest.json
@@ -144,4 +217,3 @@ obsidian-scrippets/
 - [Obsidian API docs](https://docs.obsidian.md)
 - [Sample plugin](https://github.com/obsidianmd/obsidian-sample-plugin)
 - [Developer policies](https://docs.obsidian.md/Developer+policies)
-
