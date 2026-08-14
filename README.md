@@ -112,7 +112,7 @@ The settings panel shows a **Scrippet parameters** section for every loaded scri
 
 ### Configuring CSS snippets with parameters
 
-A parameter can optionally bind to a CSS custom property with `css-var`. Scrippets keeps the property in sync with the saved parameter value and restores the previous inline value when the plugin unloads or the binding disappears.
+A parameter can optionally bind to a CSS custom property with `css-var`. For safety, bound custom-property names must start with `--scrippets-`. Scrippets keeps the property in sync with the saved parameter value and restores the previous inline value when the plugin unloads or the binding disappears.
 
 ```yaml
 settings:
@@ -134,7 +134,7 @@ The dependent CSS snippet can then use a fallback normally:
 }
 ```
 
-For CSS-bound number parameters, `unit` is appended to the custom-property value. Boolean values are exposed as `1` or `0`; string and select values are passed through as text. When more than one loaded scrippet binds the same CSS variable, the scrippet with the later ID in lexical order wins, so unique names such as `--scrippets-<id>-...` are recommended.
+For CSS-bound number parameters, `unit` is appended to the custom-property value. Boolean values are exposed as `1` or `0`; string and select values are passed through as text. When more than one loaded scrippet binds the same CSS variable, the scrippet with the later ID in lexical order wins. The `--scrippets-` prefix is required, and names such as `--scrippets-<id>-...` are recommended to avoid collisions.
 
 See `examples/toggle_nowrap.js` and `examples/nowrap.css` for a complete scrippet + snippet pair that exposes cursor margin, edge fade width, and scrollbar clearance through the settings panel.
 
