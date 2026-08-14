@@ -7,10 +7,13 @@ All notable changes to this project will be documented in this file. Dates use t
 - Add `@requires-snippet` metadata so scrippets can declare CSS snippet file dependencies that are checked before invocation.
 - Add typed per-scrippet parameters declared through `@settings` comment metadata or YAML frontmatter, persisted by scrippet ID, rendered in the settings panel, and passed to `invoke(plugin, settings)`.
 - Add optional `css-var` bindings so parameter values can configure dependent CSS snippets through custom properties.
+- Add slider controls for bounded numeric parameters with precise numeric inputs and `control: auto|slider|number` schema selection.
+- Add automatic CSS custom-property names with `css-var: true`, using `--scrippets-<scrippet-id>-<parameter-key>` by default.
 
 ### Changed
 - Extend the nowrap example with configurable cursor margin, fade width, and scrollbar clearance plus a matching CSS snippet example.
 - Prefer block-comment `@settings` metadata in JavaScript examples so scrippet files remain valid JavaScript for external tooling.
+- Show parameter defaults, resolved CSS custom-property names, and per-parameter reset actions in the settings panel.
 
 ### Fixed
 - Mask YAML frontmatter before JavaScript evaluation so frontmatter-based scrippets remain executable while preserving source line layout.
@@ -107,4 +110,3 @@ All notable changes to this project will be documented in this file. Dates use t
 [1.1.0]: https://github.com/josephcourtney/obsidian-scrippets/releases/tag/1.1.0
 [1.0.1]: https://github.com/josephcourtney/obsidian-scrippets/releases/tag/1.0.1
 [1.0.0]: https://github.com/josephcourtney/obsidian-scrippets/releases/tag/1.0.0
-
