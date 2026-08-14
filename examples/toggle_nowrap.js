@@ -14,30 +14,6 @@
     "step": 1,
     "unit": "px",
     "control": "slider"
-  },
-  "fade-width": {
-    "type": "number",
-    "label": "Edge fade width",
-    "description": "Width of the continuation fade at the right edge.",
-    "default": 32,
-    "min": 0,
-    "max": 100,
-    "step": 1,
-    "unit": "px",
-    "control": "slider",
-    "css-var": true
-  },
-  "scrollbar-offset": {
-    "type": "number",
-    "label": "Scrollbar clearance",
-    "description": "Keep the fade clear of the vertical scrollbar.",
-    "default": 12,
-    "min": 0,
-    "max": 40,
-    "step": 1,
-    "unit": "px",
-    "control": "slider",
-    "css-var": true
   }
 }
 */
