@@ -214,6 +214,28 @@
   padding-right: 0;
 }
 
+.scrippet-parameter-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 3px;
+  font-size: var(--font-smallest);
+  color: var(--text-faint);
+}
+
+.scrippet-parameter-css-var code {
+  user-select: all;
+}
+
+.scrippet-parameter-number-input {
+  width: 5.5em;
+}
+
+.scrippet-parameter-card input[type="range"] {
+  min-width: 120px;
+  flex: 1 1 160px;
+}
+
 .scrippet-parameter-unit {
   min-width: 2em;
   color: var(--text-muted);
