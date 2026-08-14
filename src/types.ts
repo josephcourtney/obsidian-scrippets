@@ -1,11 +1,37 @@
 import type { Plugin } from "obsidian";
 
+export type ScrippetParameterType = "boolean" | "number" | "string" | "select";
+export type ScrippetParameterValue = boolean | number | string;
+
+export interface ScrippetParameterOption {
+  value: string;
+  label: string;
+}
+
+export interface ScrippetParameterDefinition {
+  type: ScrippetParameterType;
+  label: string;
+  description?: string;
+  default: ScrippetParameterValue;
+  min?: number;
+  max?: number;
+  step?: number;
+  unit?: string;
+  options?: ScrippetParameterOption[];
+  cssVar?: string;
+}
+
+export type ScrippetParameterSchema = Record<string, ScrippetParameterDefinition>;
+export type ScrippetParameterValues = Record<string, ScrippetParameterValue>;
+
 export interface ScrippetMetadata {
+  [key: string]: string | ScrippetParameterSchema | undefined;
   id?: string;
   name?: string;
   desc?: string;
   description?: string;
   "requires-snippet"?: string;
+  settings?: ScrippetParameterSchema;
 }
 
 export type ScrippetKind = "command" | "startup";
@@ -47,6 +73,7 @@ export interface ScrippetPluginSettings {
   runStartupOnLoad: boolean;
   confirmBeforeFirstRun: boolean;
   scriptStates: Record<string, ScriptPreference>;
+  scrippetSettings: Record<string, ScrippetParameterValues>;
   startupAcknowledged: boolean;
   allowedExtensions: string[];
   listSort: ScrippetListSort;
@@ -58,6 +85,7 @@ export const DEFAULT_SETTINGS: ScrippetPluginSettings = {
   runStartupOnLoad: false,
   confirmBeforeFirstRun: true,
   scriptStates: {},
+  scrippetSettings: {},
   startupAcknowledged: false,
   allowedExtensions: [".js", ".cjs"],
   listSort: { field: "name", direction: "asc" },
@@ -65,7 +93,10 @@ export const DEFAULT_SETTINGS: ScrippetPluginSettings = {
 };
 
 export interface ScrippetModule {
-  invoke: (plugin: Plugin) => void | Promise<unknown>;
+  invoke: (
+    plugin: Plugin,
+    settings?: Readonly<ScrippetParameterValues>,
+  ) => void | Promise<unknown>;
 }
 
 export interface LoadedScrippet extends ScrippetDescriptor {

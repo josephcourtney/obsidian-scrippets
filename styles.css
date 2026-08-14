@@ -153,10 +153,6 @@
   font-weight: var(--font-medium);
 }
 
-.scrippet-metadata-label {
-  font-weight: var(--font-medium);
-}
-
 .scrippet-execution-history {
   display: grid;
   gap: 6px;
@@ -194,4 +190,36 @@
   color: var(--text-error);
   font-size: var(--font-small);
   overflow-wrap: anywhere;
+}
+
+.scrippet-parameter-section {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.scrippet-parameter-card {
+  padding: 4px 12px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  border-radius: 8px;
+}
+
+.scrippet-parameter-card > .setting-item:first-child {
+  border-top: 0;
+}
+
+.scrippet-parameter-card .setting-item {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.scrippet-parameter-unit {
+  min-width: 2em;
+  color: var(--text-muted);
+  font-size: var(--font-small);
+}
+
+.scrippet-parameter-invalid {
+  border-color: var(--text-error) !important;
 }
