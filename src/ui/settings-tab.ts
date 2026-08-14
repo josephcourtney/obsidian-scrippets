@@ -432,7 +432,7 @@ export class ScrippetSettingTab extends PluginSettingTab {
     if (!startup) {
       setting.addExtraButton((btn) =>
         btn
-          .setIcon("key")
+          .setIcon("keyboard")
           .setTooltip("Assign hotkey")
           .onClick(() => {
             this.openHotkeySettings(script);
