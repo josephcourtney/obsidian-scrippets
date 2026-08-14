@@ -120,9 +120,9 @@ export class ParameterizedScrippetSettingTab extends ScrippetSettingTab {
         if (definition.type === "number" && next.trim() === "") return;
         try {
           await this.saveParameterValue(descriptor, key, definition, next);
-          text.inputEl.removeClass("scrippet-parameter-invalid");
+          text.inputEl.classList.remove("scrippet-parameter-invalid");
         } catch (error) {
-          text.inputEl.addClass("scrippet-parameter-invalid");
+          text.inputEl.classList.add("scrippet-parameter-invalid");
           console.debug(`Scrippets: invalid parameter ${descriptor.id}.${key}`, error);
         }
       });
