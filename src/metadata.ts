@@ -139,7 +139,7 @@ function applyMetadataRecord(
     else if (normalized === "desc") target.desc = value;
     else if (normalized === "name") target.name = value;
     else if (normalized === "id") target.id = value;
-    else target[normalized as keyof ScrippetMetadata] = value;
+    else target[normalized] = value;
   }
 }
 
