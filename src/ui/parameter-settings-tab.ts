@@ -6,12 +6,19 @@ import {
   resolveScrippetParameterValues,
   shouldUseScrippetParameterSlider,
 } from "../parameters";
+import { getRequiredSnippetId } from "../snippet-dependency";
 import type {
+  CssSnippetParameterSource,
   ScrippetDescriptor,
   ScrippetParameterDefinition,
   ScrippetParameterValue,
 } from "../types";
 import { ScrippetSettingTab } from "./settings-tab";
+
+interface ParameterDisplayOptions {
+  cssVarName?: string;
+  sourceLabel?: string;
+}
 
 export class ParameterizedScrippetSettingTab extends ScrippetSettingTab {
   private readonly scrippetPlugin: ScrippetPlugin;
@@ -22,6 +29,10 @@ export class ParameterizedScrippetSettingTab extends ScrippetSettingTab {
     this.scrippetPlugin = plugin;
     this.scrippetPlugin.manager.subscribe(() => {
       this.syncParameterCss();
+    });
+    this.scrippetPlugin.snippetParameters.subscribe(() => {
+      this.syncParameterCss();
+      if (this.containerEl.isConnected) this.redisplayPreservingScroll();
     });
   }
 
@@ -38,7 +49,7 @@ export class ParameterizedScrippetSettingTab extends ScrippetSettingTab {
     new Setting(this.containerEl)
       .setName("Scrippet parameters")
       .setDesc(
-        "Tune values declared by each scrippet. Changes are saved by scrippet ID and passed to invoke(plugin, settings).",
+        "Tune values declared by each scrippet and its required CSS snippet. Changes are saved by scrippet ID.",
       )
       .setHeading();
 
@@ -50,14 +61,16 @@ export class ParameterizedScrippetSettingTab extends ScrippetSettingTab {
 
   private renderScrippetParameters(container: HTMLElement, descriptor: ScrippetDescriptor): void {
     const schema = descriptor.metadata.settings;
-    if (!schema) return;
+    const snippet = this.getCssSnippetSource(descriptor);
+    const snippetSchema = snippet?.settings;
+    if (!schema && !snippetSchema && !snippet?.error) return;
 
     const card = container.createDiv({ cls: "scrippet-parameter-card" });
     const header = new Setting(card).setName(descriptor.name);
-    const requiredSnippet = descriptor.metadata["requires-snippet"];
+    const requiredSnippet = this.getRequiredSnippetId(descriptor);
     header.setDesc(
       requiredSnippet
-        ? `ID: ${descriptor.id} · CSS snippet: ${requiredSnippet}`
+        ? `ID: ${descriptor.id} · CSS snippet: ${requiredSnippet}.css`
         : `ID: ${descriptor.id}`,
     );
 
@@ -75,13 +88,41 @@ export class ParameterizedScrippetSettingTab extends ScrippetSettingTab {
       );
     }
 
-    const values = resolveScrippetParameterValues(
-      schema,
-      this.scrippetPlugin.settings.scrippetSettings[descriptor.id],
-    );
+    if (snippet?.error) {
+      card.createDiv({
+        cls: "scrippet-error",
+        text: `Could not read CSS snippet parameters from ${snippet.path}: ${snippet.error}`,
+      });
+    }
 
-    for (const [key, definition] of Object.entries(schema)) {
-      this.renderParameterControl(card, descriptor, key, definition, values[key] ?? definition.default);
+    const saved = this.scrippetPlugin.settings.scrippetSettings[descriptor.id];
+    const values = resolveScrippetParameterValues(schema, saved);
+    for (const [key, definition] of Object.entries(schema ?? {})) {
+      this.renderParameterControl(
+        card,
+        descriptor,
+        key,
+        definition,
+        values[key] ?? definition.default,
+        {
+          cssVarName: resolveScrippetParameterCssVarName(descriptor.id, key, definition),
+        },
+      );
+    }
+
+    const snippetValues = resolveScrippetParameterValues(snippetSchema, saved);
+    for (const [key, definition] of Object.entries(snippetSchema ?? {})) {
+      this.renderParameterControl(
+        card,
+        descriptor,
+        key,
+        definition,
+        snippetValues[key] ?? definition.default,
+        {
+          cssVarName: definition.cssVar,
+          sourceLabel: snippet ? `${snippet.id}.css` : undefined,
+        },
+      );
     }
   }
 
@@ -91,10 +132,11 @@ export class ParameterizedScrippetSettingTab extends ScrippetSettingTab {
     key: string,
     definition: ScrippetParameterDefinition,
     value: ScrippetParameterValue,
+    options: ParameterDisplayOptions = {},
   ): void {
     const setting = new Setting(container).setName(definition.label);
     if (definition.description) setting.setDesc(definition.description);
-    this.renderParameterDetails(setting, descriptor, key, definition);
+    this.renderParameterDetails(setting, definition, options);
 
     if (definition.type === "boolean") {
       setting.addToggle((toggle) =>
@@ -202,9 +244,8 @@ export class ParameterizedScrippetSettingTab extends ScrippetSettingTab {
 
   private renderParameterDetails(
     setting: Setting,
-    descriptor: ScrippetDescriptor,
-    key: string,
     definition: ScrippetParameterDefinition,
+    options: ParameterDisplayOptions,
   ): void {
     const details = setting.descEl.createDiv({ cls: "scrippet-parameter-details" });
     details.createSpan({
@@ -212,11 +253,17 @@ export class ParameterizedScrippetSettingTab extends ScrippetSettingTab {
       text: `Default: ${this.formatParameterValue(definition, definition.default)}`,
     });
 
-    const cssVar = resolveScrippetParameterCssVarName(descriptor.id, key, definition);
-    if (cssVar) {
+    if (options.sourceLabel) {
+      details.createSpan({
+        cls: "scrippet-parameter-source",
+        text: `Source: ${options.sourceLabel}`,
+      });
+    }
+
+    if (options.cssVarName) {
       const cssDetail = details.createSpan({ cls: "scrippet-parameter-css-var" });
       cssDetail.createSpan({ text: "CSS: " });
-      cssDetail.createEl("code", { text: cssVar });
+      cssDetail.createEl("code", { text: options.cssVarName });
     }
   }
 
@@ -278,8 +325,24 @@ export class ParameterizedScrippetSettingTab extends ScrippetSettingTab {
   private getParameterizedDescriptors(): ScrippetDescriptor[] {
     const { commands, startup } = this.scrippetPlugin.manager.scan;
     return [...commands, ...startup]
-      .filter((descriptor) => Boolean(descriptor.metadata.settings))
+      .filter((descriptor) => {
+        const snippet = this.getCssSnippetSource(descriptor);
+        return Boolean(descriptor.metadata.settings || snippet?.settings || snippet?.error);
+      })
       .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  private getCssSnippetSource(descriptor: ScrippetDescriptor): CssSnippetParameterSource | undefined {
+    const snippetId = this.getRequiredSnippetId(descriptor);
+    return snippetId ? this.scrippetPlugin.snippetParameters.get(snippetId) : undefined;
+  }
+
+  private getRequiredSnippetId(descriptor: ScrippetDescriptor): string | undefined {
+    try {
+      return getRequiredSnippetId(descriptor.metadata);
+    } catch {
+      return undefined;
+    }
   }
 
   private hasSavedValues(id: string): boolean {
@@ -291,6 +354,7 @@ export class ParameterizedScrippetSettingTab extends ScrippetSettingTab {
     this.scrippetPlugin.parameterCss.sync(
       [...commands, ...startup],
       this.scrippetPlugin.settings.scrippetSettings,
+      (id) => this.scrippetPlugin.snippetParameters.get(id),
     );
   }
 
