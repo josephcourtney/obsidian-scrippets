@@ -25,6 +25,7 @@ export type ScrippetParameterSchema = Record<string, ScrippetParameterDefinition
 export type ScrippetParameterValues = Record<string, ScrippetParameterValue>;
 
 export interface ScrippetMetadata {
+  [key: string]: string | ScrippetParameterSchema | undefined;
   id?: string;
   name?: string;
   desc?: string;
