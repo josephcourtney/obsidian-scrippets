@@ -24,12 +24,7 @@ Scrippets live in `/<vault>/<folder>/*.js`. By default, the folder is `<vault co
 Each file must expose an `invoke(plugin)` function. Three export shapes are supported:
 
 ```js
-/*
- * @name: Toggle Wrap
- * @id: toggle-wrap
- * @desc: Toggle the nowrap snippet
- * @requires-snippet: nowrap
- */
+/* @name: Toggle Wrap @id: toggle-wrap @desc: Toggle the nowrap snippet @requires-snippet: nowrap */
 class Scrippet {
   async invoke(plugin) {
     const { app } = plugin;
